@@ -519,18 +519,20 @@ function check_date($chat_id) {
     sendMessage($chat_id, $msg, null, 'HTML');
 }
 
-function total_uploads($chat_id) {
+function total_uploads($chat_id, $page = 1) {
     if (!file_exists(CSV_FILE)) {
         sendMessage($chat_id, "⚠️ Abhi tak koi data save nahi hua.");
         return;
     }
     
+    $items_per_page = 5;
     $total = 0;
     $today_str = date('d-m-Y');
     $yesterday_str = date('d-m-Y', strtotime('-1 day'));
     $today_count = 0;
     $yesterday_count = 0;
     $weekly_total = 0;
+    $all_dates = array();
     
     $handle = fopen(CSV_FILE, "r");
     if ($handle !== FALSE) {
@@ -539,6 +541,12 @@ function total_uploads($chat_id) {
             if (count($row) >= 3) {
                 $total++;
                 $date = $row[2];
+                
+                if (!isset($all_dates[$date])) {
+                    $all_dates[$date] = 0;
+                }
+                $all_dates[$date]++;
+                
                 if ($date == $today_str) {
                     $today_count++;
                 } elseif ($date == $yesterday_str) {
@@ -558,14 +566,52 @@ function total_uploads($chat_id) {
         fclose($handle);
     }
     
+    // Sort dates in descending order
+    krsort($all_dates);
+    
+    // Calculate pagination
+    $total_pages = ceil(count($all_dates) / $items_per_page);
+    $current_page = max(1, min($page, $total_pages));
+    $start_index = ($current_page - 1) * $items_per_page;
+    $paginated_dates = array_slice($all_dates, $start_index, $items_per_page, true);
+    
     $msg = "📊 <b>Upload Statistics</b>\n\n";
     $msg .= "• 🎬 Total: $total movies\n";
     $msg .= "• 🚀 Today: $today_count movies\n";
     $msg .= "• 📈 Yesterday: $yesterday_count movies\n";
     $msg .= "• 📅 Last 7 days: $weekly_total movies\n";
-    $msg .= "• ⭐ Daily avg: " . round($total / max(1, count(array_unique($date_counts))), 2) . " movies";
+    $msg .= "• ⭐ Daily avg: " . round($total / max(1, count($all_dates)), 2) . " movies\n\n";
     
-    sendMessage($chat_id, $msg, null, 'HTML');
+    $msg .= "📅 <b>Date-wise Breakdown (Page $current_page/$total_pages):</b>\n";
+    $index = 1;
+    foreach ($paginated_dates as $date => $count) {
+        $msg .= ($start_index + $index) . ". $date: $count movies\n";
+        $index++;
+    }
+    
+    // Add pagination buttons if needed
+    $keyboard = null;
+    if ($total_pages > 1) {
+        $keyboard = ['inline_keyboard' => []];
+        
+        if ($current_page > 1) {
+            $keyboard['inline_keyboard'][] = [
+                ['text' => '⏮️ Previous', 'callback_data' => 'uploads_page_' . ($current_page - 1)]
+            ];
+        }
+        
+        if ($current_page < $total_pages) {
+            $keyboard['inline_keyboard'][] = [
+                ['text' => '⏭️ Next', 'callback_data' => 'uploads_page_' . ($current_page + 1)]
+            ];
+        }
+        
+        $keyboard['inline_keyboard'][] = [
+            ['text' => '🛑 Stop', 'callback_data' => 'uploads_stop']
+        ];
+    }
+    
+    sendMessage($chat_id, $msg, $keyboard, 'HTML');
 }
 
 function test_csv($chat_id) {
@@ -691,19 +737,31 @@ if ($update) {
         $query = $update['callback_query'];
         $message = $query['message'];
         $chat_id = $message['chat']['id'];
-        $movie = $query['data'];
+        $data = $query['data'];
         
+        // Movie selection handle karo
         global $movie_messages;
-        $movie_lower = strtolower($movie);
+        $movie_lower = strtolower($data);
         if (isset($movie_messages[$movie_lower])) {
             $message_count = count($movie_messages[$movie_lower]);
             foreach ($movie_messages[$movie_lower] as $msg_id) {
                 forwardMessage($chat_id, CHANNEL_ID, $msg_id);
             }
-            sendMessage($chat_id, "✅ '$movie' ke $message_count messages forward ho gaye!");
+            sendMessage($chat_id, "✅ '$data' ke $message_count messages forward ho gaye!");
             answerCallbackQuery($query['id'], "🎬 $message_count messages forwarded!");
-        } else {
-            sendMessage($chat_id, "❌ Movie not found: " . $movie);
+        } 
+        // Uploads pagination handle karo
+        elseif (strpos($data, 'uploads_page_') === 0) {
+            $page = intval(str_replace('uploads_page_', '', $data));
+            total_uploads($chat_id, $page);
+            answerCallbackQuery($query['id'], "Page $page loaded");
+        }
+        elseif ($data == 'uploads_stop') {
+            sendMessage($chat_id, "✅ Pagination stopped. Type /totaluploads again to restart.");
+            answerCallbackQuery($query['id'], "Pagination stopped");
+        }
+        else {
+            sendMessage($chat_id, "❌ Movie not found: " . $data);
             answerCallbackQuery($query['id'], "❌ Movie not available");
         }
     }
