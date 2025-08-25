@@ -299,6 +299,34 @@ function load_and_clean_csv($filename = CSV_FILE) {
     return $data;
 }
 
+// ==============================
+// NEW: Helper function to load movies from CSV
+// ==============================
+function load_movies_from_csv() {
+    $movies = array();
+    
+    if (!file_exists(CSV_FILE)) {
+        return $movies;
+    }
+    
+    $handle = fopen(CSV_FILE, "r");
+    if ($handle !== FALSE) {
+        fgetcsv($handle); // Skip header
+        while (($row = fgetcsv($handle)) !== FALSE) {
+            if (count($row) >= 3) {
+                $movies[] = [
+                    'name' => $row[0],
+                    'message_id' => $row[1],
+                    'date' => $row[2]
+                ];
+            }
+        }
+        fclose($handle);
+    }
+    
+    return $movies;
+}
+
 function append_movie($movie_name, $message_id) {
     if (empty(trim($movie_name))) {
         error_log("❌ Empty movie_name skipped");
@@ -411,7 +439,7 @@ function admin_stats($chat_id) {
     $msg = "📊 <b>Bot Statistics</b>\n\n";
     $msg .= "🎬 Total Movies: " . ($stats['total_movies'] ?? 0) . "\n";
     $msg .= "👥 Total Users: " . $total_users . "\n";
-    $msg .= "🔍 Total Searches: " . ($stats['total_seaches'] ?? 0) . "\n";
+    $msg .= "🔍 Total Searches: " . ($stats['total_searches'] ?? 0) . "\n";
     $msg .= "🕒 Last Updated: " . ($stats['last_updated'] ?? 'N/A') . "\n\n";
     
     // Recent activity
@@ -777,13 +805,37 @@ if ($update) {
             answerCallbackQuery($query['id'], "Page $page loaded");
         }
         elseif ($data == 'view_current_movie') {
-            // Current page ki movies show karein
+            // Get current page number from message text
             $message_text = $query['message']['text'];
             if (preg_match('/Page (\d+)\/(\d+)/', $message_text, $matches)) {
                 $current_page = $matches[1];
-                total_uploads($chat_id, $current_page);
+                
+                // Load all movies from CSV
+                $all_movies = load_movies_from_csv();
+                
+                // Reverse to show latest first and get current page movies
+                $all_movies = array_reverse($all_movies);
+                $items_per_page = 5;
+                $start_index = ($current_page - 1) * $items_per_page;
+                $current_movies = array_slice($all_movies, $start_index, $items_per_page);
+                
+                // Forward each movie from current page
+                $forwarded_count = 0;
+                foreach ($current_movies as $movie) {
+                    if (forwardMessage($chat_id, CHANNEL_ID, $movie['message_id'])) {
+                        $forwarded_count++;
+                        // Add small delay between forwards
+                        usleep(500000); // 0.5 second delay
+                    }
+                }
+                
+                if ($forwarded_count > 0) {
+                    sendMessage($chat_id, "✅ Current page ki $forwarded_count movies forward ho gayi!\n\n📢 Join: @EntertainmentTadka786");
+                } else {
+                    sendMessage($chat_id, "❌ Kuch technical issue hai. Baad mein try karein.");
+                }
             }
-            answerCallbackQuery($query['id'], "Loading movies...");
+            answerCallbackQuery($query['id'], "Movies forwarding...");
         }
         elseif ($data == 'uploads_stop') {
             sendMessage($chat_id, "✅ Pagination stopped. Type /totaluploads again to restart.");
