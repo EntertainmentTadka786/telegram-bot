@@ -6,9 +6,10 @@ error_reporting(E_ALL);
 
 // -------------------- CONFIG --------------------
 define('BOT_TOKEN', '8315381064:AAGk0FGVGmB8j5SjpBvW3rD3_kQHe_hyOWU');
-define('CHANNEL_ID', '@EntertainmentTadka786');
+define('CHANNEL_ID', '@EntertainmentTadka786');      // Pehla channel
+define('CHANNEL_ID_2', '@EntertainmentTadka7862');   // Dusra channel - ADDED
 define('GROUP_CHANNEL_ID', '@EntertainmentTadka7860');
-define('CSV_FILE', 'movies.csv');               // expected: movie_name,message_id,date[,video_path]
+define('CSV_FILE', 'movies.csv');
 define('USERS_FILE', 'users.json');
 define('STATS_FILE', 'bot_stats.json');
 define('BACKUP_DIR', 'backups/');
@@ -76,7 +77,6 @@ function load_and_clean_csv($filename = CSV_FILE) {
     if ($handle !== FALSE) {
         $header = fgetcsv($handle);
         while (($row = fgetcsv($handle)) !== FALSE) {
-            // Accept rows with at least 3 columns; 4th optional video_path
             if (count($row) >= 3 && (!empty(trim($row[0])))) {
                 $movie_name = trim($row[0]);
                 $message_id_raw = isset($row[1]) ? trim($row[1]) : '';
@@ -105,13 +105,13 @@ function load_and_clean_csv($filename = CSV_FILE) {
         fclose($handle);
     }
 
-    // Update stats: set total movies
+    // Update stats
     $stats = json_decode(file_get_contents(STATS_FILE), true);
     $stats['total_movies'] = count($data);
     $stats['last_updated'] = date('Y-m-d H:i:s');
     file_put_contents(STATS_FILE, json_encode($stats, JSON_PRETTY_PRINT));
 
-    // Re-write CSV with consistent header (preserve original contents)
+    // Re-write CSV
     $handle = fopen($filename, "w");
     fputcsv($handle, array('movie_name','message_id','date','video_path'));
     foreach ($data as $row) {
@@ -198,14 +198,18 @@ function answerCallbackQuery($callback_query_id, $text = null) {
 }
 
 // ==============================
-// DELIVERY LOGIC (Simplified per request)
-// If message_id is numeric -> forwardMessage()
-// Else -> sendText fallback
+// DELIVERY LOGIC - UPDATED FOR DUAL CHANNELS
 // ==============================
 function deliver_item_to_chat($chat_id, $item) {
-    // If numeric message_id -> forward
+    // If numeric message_id -> forward to BOTH channels
     if (!empty($item['message_id']) && is_numeric($item['message_id'])) {
+        // Pehle channel mein forward
         forwardMessage($chat_id, CHANNEL_ID, $item['message_id']);
+        
+        // Dusre channel mein forward (agar set hai toh) - NEW
+        if (defined('CHANNEL_ID_2') && !empty(CHANNEL_ID_2)) {
+            forwardMessage($chat_id, CHANNEL_ID_2, $item['message_id']);
+        }
         return true;
     }
 
@@ -218,7 +222,7 @@ function deliver_item_to_chat($chat_id, $item) {
 }
 
 // ==============================
-// Pagination helpers (for /totalupload)
+// Pagination helpers
 // ==============================
 function get_all_movies_list() {
     $all = get_cached_movies();
@@ -244,7 +248,7 @@ function forward_page_movies($chat_id, array $page_movies) {
     foreach ($page_movies as $m) {
         $num = str_pad((string)$i, 2, '0', STR_PAD_LEFT);
         deliver_item_to_chat($chat_id, $m);
-        usleep(300000); // 0.3s throttle
+        usleep(300000);
         $i++;
     }
 }
@@ -284,7 +288,7 @@ function totalupload_controller($chat_id, $page = 1) {
 }
 
 // ==============================
-// Append movie (simple)
+// Append movie
 // ==============================
 function append_movie($movie_name, $message_id_raw, $date = null, $video_path = '') {
     if (empty(trim($movie_name))) return;
@@ -472,7 +476,7 @@ function send_daily_digest() {
 }
 
 // ==============================
-// Other commands (check_date/test_csv etc.)
+// Other commands
 // ==============================
 function check_date($chat_id) {
     if (!file_exists(CSV_FILE)) { sendMessage($chat_id, "⚠️ Abhi tak koi data save nahi hua."); return; }
@@ -518,10 +522,8 @@ function test_csv($chat_id) {
 // ==============================
 $update = json_decode(file_get_contents('php://input'), true);
 if ($update) {
-    // refresh cache at start of update
     get_cached_movies();
 
-    // channel_post -> append_movie
     if (isset($update['channel_post'])) {
         $message = $update['channel_post'];
         $message_id = $message['message_id'];
@@ -531,14 +533,12 @@ if ($update) {
         }
     }
 
-    // user message
     if (isset($update['message'])) {
         $message = $update['message'];
         $chat_id = $message['chat']['id'];
         $user_id = $message['from']['id'];
         $text = isset($message['text']) ? $message['text'] : '';
 
-        // save user
         $users_data = json_decode(file_get_contents(USERS_FILE), true);
         if (!isset($users_data['users'][$user_id])) {
             $users_data['users'][$user_id] = [
@@ -556,7 +556,6 @@ if ($update) {
         $users_data['users'][$user_id]['last_active'] = date('Y-m-d H:i:s');
         file_put_contents(USERS_FILE, json_encode($users_data, JSON_PRETTY_PRINT));
 
-        // commands
         if (strpos($text, '/') === 0) {
             $parts = explode(' ', $text);
             $command = $parts[0];
@@ -565,7 +564,7 @@ if ($update) {
             elseif ($command == '/testcsv') test_csv($chat_id);
             elseif ($command == '/start') {
                 $welcome = "🎬 <b>Welcome to Entertainment Tadka!</b>\n\n";
-                $welcome .= "📢 Join our channel: @EntertainmentTadka786\n\n";
+                $welcome .= "📢 Join our channels: @EntertainmentTadka786 + @EntertainmentTadka7862\n\n";
                 $welcome .= "🤖 <b>Bot Commands:</b>\n/checkdate - Date-wise upload stats\n/totalupload - Total upload counts\n/help - Help message\n\n";
                 $welcome .= "🔍 <b>Simply type any movie name to search!</b>";
                 sendMessage($chat_id, $welcome, null, 'HTML');
@@ -573,7 +572,7 @@ if ($update) {
             }
             elseif ($command == '/stats' && $user_id == 1080317415) admin_stats($chat_id);
             elseif ($command == '/help') {
-                $help = "🤖 <b>Entertainment Tadka Bot</b>\n\n📢 Join our channel: @EntertainmentTadka786\n\n📋 <b>Available Commands:</b>\n/start, /checkdate, /totalupload, /testcsv, /help\n\n🔍 <b>Simply type any movie name to search!</b>";
+                $help = "🤖 <b>Entertainment Tadka Bot</b>\n\n📢 Join our channels: @EntertainmentTadka786 + @EntertainmentTadka7862\n\n📋 <b>Available Commands:</b>\n/start, /checkdate, /totalupload, /testcsv, /help\n\n🔍 <b>Simply type any movie name to search!</b>";
                 sendMessage($chat_id, $help, null, 'HTML');
             }
         } else if (!empty(trim($text))) {
@@ -583,7 +582,6 @@ if ($update) {
         }
     }
 
-    // callback queries (buttons)
     if (isset($update['callback_query'])) {
         $query = $update['callback_query'];
         $message = $query['message'];
@@ -600,7 +598,7 @@ if ($update) {
                 usleep(200000);
                 $cnt++;
             }
-            sendMessage($chat_id, "✅ '$data' ke $cnt messages forward/send ho gaye!\n\n📢 Join our channel: @EntertainmentTadka786");
+            sendMessage($chat_id, "✅ '$data' ke $cnt messages forward/send ho gaye!\n\n📢 Join our channels: @EntertainmentTadka786 + @EntertainmentTadka7862");
             answerCallbackQuery($query['id'], "🎬 $cnt items sent!");
         }
         elseif (strpos($data, 'tu_prev_') === 0) {
@@ -642,7 +640,7 @@ if ($update) {
                     if (deliver_item_to_chat($chat_id, $movie)) $forwarded++;
                     usleep(500000);
                 }
-                if ($forwarded > 0) sendMessage($chat_id, "✅ Current page ki $forwarded movies forward ho gayi!\n\n📢 Join: @EntertainmentTadka786");
+                if ($forwarded > 0) sendMessage($chat_id, "✅ Current page ki $forwarded movies forward ho gayi!\n\n📢 Join: @EntertainmentTadka786 + @EntertainmentTadka7862");
                 else sendMessage($chat_id, "❌ Kuch technical issue hai. Baad mein try karein.");
             }
             answerCallbackQuery($query['id'], "Movies forwarding...");
@@ -661,7 +659,6 @@ if ($update) {
     if (date('H:i') == '08:00') send_daily_digest();
 }
 
-// webhook setup UI
 if (php_sapi_name() === 'cli' || isset($_GET['setwebhook'])) {
     $webhook_url = (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http") . "://$_SERVER[HTTP_HOST]$_SERVER[REQUEST_URI]";
     $result = apiRequest('setWebhook', ['url' => $webhook_url]);
@@ -673,17 +670,16 @@ if (php_sapi_name() === 'cli' || isset($_GET['setwebhook'])) {
         echo "<h2>Bot Info</h2>";
         echo "<p>Name: " . htmlspecialchars($bot_info['result']['first_name']) . "</p>";
         echo "<p>Username: @" . htmlspecialchars($bot_info['result']['username']) . "</p>";
-        echo "<p>Channel: @EntertainmentTadka786</p>";
+        echo "<p>Channels: @EntertainmentTadka786 + @EntertainmentTadka7862</p>";
     }
     exit;
 }
 
-// info page
 if (!isset($update) || !$update) {
     $stats = get_stats();
     $users_data = json_decode(file_get_contents(USERS_FILE), true);
     echo "<h1>🎬 Entertainment Tadka Bot</h1>";
-    echo "<p><strong>Telegram Channel:</strong> @EntertainmentTadka786</p>";
+    echo "<p><strong>Telegram Channels:</strong> @EntertainmentTadka786 + @EntertainmentTadka7862</p>";
     echo "<p><strong>Status:</strong> ✅ Running</p>";
     echo "<p><strong>Total Movies:</strong> " . ($stats['total_movies'] ?? 0) . "</p>";
     echo "<p><strong>Total Users:</strong> " . count($users_data['users'] ?? []) . "</p>";
@@ -694,7 +690,7 @@ if (!isset($update) || !$update) {
     echo "<ul>";
     echo "<li><code>/start</code> - Welcome message</li>";
     echo "<li><code>/checkdate</code> - Date-wise stats</li>";
-    echo "<li><code>/totalupload</code> - Upload statistics + forward videos (only numeric message_id forwarded)</li>";
+    echo "<li><code>/totalupload</code> - Upload statistics</li>";
     echo "<li><code>/testcsv</code> - View all movies</li>";
     echo "<li><code>/help</code> - Help message</li>";
     echo "<li><code>/stats</code> - Admin statistics</li>";
@@ -715,6 +711,7 @@ if (!isset($update) || !$update) {
     echo "<li>🛡️ Auto-Backup System</li>";
     echo "<li>🎮 User Points System</li>";
     echo "<li>📅 Daily Digest</li>";
+    echo "<li>🎯 Dual Channel Support</li>";
     echo "</ul>";
 }
 ?>
