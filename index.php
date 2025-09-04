@@ -7,7 +7,7 @@ error_reporting(E_ALL);
 // -------------------- CONFIG --------------------
 define('BOT_TOKEN', '8315381064:AAGk0FGVGmB8j5SjpBvW3rD3_kQHe_hyOWU');
 define('CHANNEL_ID', '@EntertainmentTadka786');
-define('GROUP_CHANNEL_ID', '@EntertainmentTadka7860');
+define('GROUP_CHANNEL_ID', '@EntertainmentTadka0786');
 define('CSV_FILE', 'movies.csv');
 define('USERS_FILE', 'users.json');
 define('STATS_FILE', 'bot_stats.json');
