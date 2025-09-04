@@ -6,8 +6,7 @@ error_reporting(E_ALL);
 
 // -------------------- CONFIG --------------------
 define('BOT_TOKEN', '8315381064:AAGk0FGVGmB8j5SjpBvW3rD3_kQHe_hyOWU');
-define('CHANNEL_ID', '@EntertainmentTadka786');      // Pehla channel
-define('CHANNEL_ID_2', '@EntertainmentTadka7862');   // Dusra channel - ADDED
+define('CHANNEL_ID', '@EntertainmentTadka786');
 define('GROUP_CHANNEL_ID', '@EntertainmentTadka7860');
 define('CSV_FILE', 'movies.csv');
 define('USERS_FILE', 'users.json');
@@ -198,18 +197,13 @@ function answerCallbackQuery($callback_query_id, $text = null) {
 }
 
 // ==============================
-// DELIVERY LOGIC - UPDATED FOR DUAL CHANNELS
+// DELIVERY LOGIC - SINGLE CHANNEL
 // ==============================
 function deliver_item_to_chat($chat_id, $item) {
-    // If numeric message_id -> forward to BOTH channels
+    // If numeric message_id -> forward to SINGLE CHANNEL
     if (!empty($item['message_id']) && is_numeric($item['message_id'])) {
-        // Pehle channel mein forward
+        // Sirf ek channel mein forward
         forwardMessage($chat_id, CHANNEL_ID, $item['message_id']);
-        
-        // Dusre channel mein forward (agar set hai toh) - NEW
-        if (defined('CHANNEL_ID_2') && !empty(CHANNEL_ID_2)) {
-            forwardMessage($chat_id, CHANNEL_ID_2, $item['message_id']);
-        }
         return true;
     }
 
@@ -226,7 +220,7 @@ function deliver_item_to_chat($chat_id, $item) {
 // ==============================
 function get_all_movies_list() {
     $all = get_cached_movies();
-    return array_reverse($all);
+    return $all;  // ASCENDING ORDER (A-Z) KE LIYE
 }
 
 function paginate_movies(array $all, int $page): array {
@@ -356,18 +350,19 @@ function detect_language($text) {
 }
 
 function send_multilingual_response($chat_id, $message_type, $language) {
+    // HINGLISH RESPONSES - UPDATED
     $responses = [
         'hindi'=>[
-            'welcome'=>"🎬 स्वागत है! कौन सी मूवी चाहिए?",
-            'found'=>"✅ मूवी मिल गई!",
-            'not_found'=>"❌ अभी यह मूवी उपलब्ध नहीं है",
-            'searching'=>"🔍 आपकी मूवी ढूंढ रहे हैं..."
+            'welcome' => "🎬 Boss, kis movie ki talash hai?",
+            'found' => "✅ Mil gayi! Movie forward ho rahi hai...",
+            'not_found' => "😔 Yeh movie abhi available nahi hai!\n\n📝 Aap ise request kar sakte hain: @EntertainmentTadka7860\n\n🔔 Jab bhi yeh add hogi, main automatically bhej dunga!",
+            'searching' => "🔍 Dhoondh raha hoon... Zara wait karo"
         ],
         'english'=>[
-            'welcome'=>"🎬 Welcome! Which movie do you want?",
-            'found'=>"✅ Movie found!",
-            'not_found'=>"❌ Movie not available yet",
-            'searching'=>"🔍 Searching for your movie..."
+            'welcome' => "🎬 Boss, which movie are you looking for?",
+            'found' => "✅ Found it! Forwarding the movie...",
+            'not_found' => "😔 This movie isn't available yet!\n\n📝 You can request it here: @EntertainmentTadka7860\n\n🔔 I'll send it automatically once it's added!",
+            'searching' => "🔍 Searching... Please wait"
         ]
     ];
     sendMessage($chat_id, $responses[$language][$message_type]);
@@ -385,10 +380,36 @@ function update_user_points($user_id, $action) {
 function advanced_search($chat_id, $query, $user_id = null) {
     global $movie_messages, $waiting_users;
     $q = strtolower(trim($query));
+    
+    // ✅ Check if query looks like a movie name
     if (strlen($q) < 2) {
         sendMessage($chat_id, "❌ Please enter at least 2 characters for search");
         return;
     }
+    
+    // ✅ Filter out non-movie queries
+    $invalid_keywords = ['vlc', 'audio', 'track', 'change', 'open', 'kar', 'me', 'hai', 'how', 'what', 'problem', 'issue', 'help'];
+    $query_words = explode(' ', $q);
+    
+    $invalid_count = 0;
+    foreach ($query_words as $word) {
+        if (in_array($word, $invalid_keywords)) {
+            $invalid_count++;
+        }
+    }
+    
+    // Agar 50% se zyada words invalid hain toh
+    if ($invalid_count > 0 && ($invalid_count / count($query_words)) > 0.5) {
+        $help_msg = "🎬 <b>Please enter a movie name!</b>\n\n";
+        $help_msg .= "🔍 <b>Examples of movie names:</b>\n";
+        $help_msg .= "• kgf\n• pushpa\n• avengers\n• hindi movie\n• spider-man\n\n";
+        $help_msg .= "❌ <i>Technical queries like 'vlc', 'audio track', etc. are not movie names.</i>\n\n";
+        $help_msg .= "📢 Join: @EntertainmentTadka786\n";
+        $help_msg .= "💬 Help: @EntertainmentTadka7860";
+        sendMessage($chat_id, $help_msg, null, 'HTML');
+        return;
+    }
+    
     $found = smart_search($q);
     if (!empty($found)) {
         $msg = "🔍 Found " . count($found) . " movies for '$query':\n\n";
@@ -564,15 +585,22 @@ if ($update) {
             elseif ($command == '/testcsv') test_csv($chat_id);
             elseif ($command == '/start') {
                 $welcome = "🎬 <b>Welcome to Entertainment Tadka!</b>\n\n";
-                $welcome .= "📢 Join our channels: @EntertainmentTadka786 + @EntertainmentTadka7862\n\n";
-                $welcome .= "🤖 <b>Bot Commands:</b>\n/checkdate - Date-wise upload stats\n/totalupload - Total upload counts\n/help - Help message\n\n";
-                $welcome .= "🔍 <b>Simply type any movie name to search!</b>";
+                $welcome .= "📢 <b>How to use this bot:</b>\n";
+                $welcome .= "• Simply type any movie name\n";
+                $welcome .= "• Use English or Hindi\n";
+                $welcome .= "• Partial names also work\n\n";
+                $welcome .= "🔍 <b>Examples:</b>\n";
+                $welcome .= "• kgf\n• pushpa\n• avengers\n• hindi movie\n• spider-man\n\n";
+                $welcome .= "❌ <b>Don't type:</b>\n";
+                $welcome .= "• Technical questions\n• Player instructions\n• Non-movie queries\n\n";
+                $welcome .= "📢 Join: @EntertainmentTadka786\n";
+                $welcome .= "💬 Request/Help: @EntertainmentTadka7860";
                 sendMessage($chat_id, $welcome, null, 'HTML');
                 update_user_points($user_id, 'daily_login');
             }
             elseif ($command == '/stats' && $user_id == 1080317415) admin_stats($chat_id);
             elseif ($command == '/help') {
-                $help = "🤖 <b>Entertainment Tadka Bot</b>\n\n📢 Join our channels: @EntertainmentTadka786 + @EntertainmentTadka7862\n\n📋 <b>Available Commands:</b>\n/start, /checkdate, /totalupload, /testcsv, /help\n\n🔍 <b>Simply type any movie name to search!</b>";
+                $help = "🤖 <b>Entertainment Tadka Bot</b>\n\n📢 Join our channel: @EntertainmentTadka786\n\n📋 <b>Available Commands:</b>\n/start, /checkdate, /totalupload, /testcsv, /help\n\n🔍 <b>Simply type any movie name to search!</b>";
                 sendMessage($chat_id, $help, null, 'HTML');
             }
         } else if (!empty(trim($text))) {
@@ -598,7 +626,7 @@ if ($update) {
                 usleep(200000);
                 $cnt++;
             }
-            sendMessage($chat_id, "✅ '$data' ke $cnt messages forward/send ho gaye!\n\n📢 Join our channels: @EntertainmentTadka786 + @EntertainmentTadka7862");
+            sendMessage($chat_id, "✅ '$data' ke $cnt messages forward/send ho gaye!\n\n📢 Join our channel: @EntertainmentTadka786");
             answerCallbackQuery($query['id'], "🎬 $cnt items sent!");
         }
         elseif (strpos($data, 'tu_prev_') === 0) {
@@ -640,7 +668,7 @@ if ($update) {
                     if (deliver_item_to_chat($chat_id, $movie)) $forwarded++;
                     usleep(500000);
                 }
-                if ($forwarded > 0) sendMessage($chat_id, "✅ Current page ki $forwarded movies forward ho gayi!\n\n📢 Join: @EntertainmentTadka786 + @EntertainmentTadka7862");
+                if ($forwarded > 0) sendMessage($chat_id, "✅ Current page ki $forwarded movies forward ho gayi!\n\n📢 Join: @EntertainmentTadka786");
                 else sendMessage($chat_id, "❌ Kuch technical issue hai. Baad mein try karein.");
             }
             answerCallbackQuery($query['id'], "Movies forwarding...");
@@ -670,7 +698,7 @@ if (php_sapi_name() === 'cli' || isset($_GET['setwebhook'])) {
         echo "<h2>Bot Info</h2>";
         echo "<p>Name: " . htmlspecialchars($bot_info['result']['first_name']) . "</p>";
         echo "<p>Username: @" . htmlspecialchars($bot_info['result']['username']) . "</p>";
-        echo "<p>Channels: @EntertainmentTadka786 + @EntertainmentTadka7862</p>";
+        echo "<p>Channel: @EntertainmentTadka786</p>";
     }
     exit;
 }
@@ -679,7 +707,7 @@ if (!isset($update) || !$update) {
     $stats = get_stats();
     $users_data = json_decode(file_get_contents(USERS_FILE), true);
     echo "<h1>🎬 Entertainment Tadka Bot</h1>";
-    echo "<p><strong>Telegram Channels:</strong> @EntertainmentTadka786 + @EntertainmentTadka7862</p>";
+    echo "<p><strong>Telegram Channel:</strong> @EntertainmentTadka786</p>";
     echo "<p><strong>Status:</strong> ✅ Running</p>";
     echo "<p><strong>Total Movies:</strong> " . ($stats['total_movies'] ?? 0) . "</p>";
     echo "<p><strong>Total Users:</strong> " . count($users_data['users'] ?? []) . "</p>";
@@ -711,7 +739,6 @@ if (!isset($update) || !$update) {
     echo "<li>🛡️ Auto-Backup System</li>";
     echo "<li>🎮 User Points System</li>";
     echo "<li>📅 Daily Digest</li>";
-    echo "<li>🎯 Dual Channel Support</li>";
     echo "</ul>";
 }
 ?>
