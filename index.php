@@ -633,6 +633,38 @@ function show_csv_data($chat_id, $show_all = false) {
 }
 
 // ==============================
+// Test Channel Posts - TEMPORARY
+// ==============================
+function test_channel_save() {
+    $test_movies = [
+        "Metro In Dino (2025)",
+        "Metro In Dino 2025 WebRip 480p x265 HEVC 10bit Hindi ESubs",
+        "Metro In Dino (2025) Hindi 720p HEVC HDRip x265 AAC 5.1 ESubs",
+        "Metro In Dino (2025) Hindi 720p HDRip x264 AAC 5.1 ESubs",
+        "Metro In Dino (2025) Hindi 1080p HDRip x264 AAC 5.1 ESubs"
+    ];
+    
+    foreach ($test_movies as $movie) {
+        $entry = [$movie, rand(1000, 9999), date('d-m-Y'), ''];
+        $handle = fopen(CSV_FILE, "a");
+        if ($handle !== FALSE) {
+            fputcsv($handle, $entry);
+            fclose($handle);
+            error_log("✅ Test saved: " . $movie);
+        }
+    }
+    
+    // Force reload
+    global $movie_cache, $movie_messages;
+    $movie_cache = [];
+    $movie_messages = [];
+    get_cached_movies();
+}
+
+// Temporary: Uncomment to test
+// test_channel_save();
+
+// ==============================
 // Backups & daily digest
 // ==============================
 function auto_backup() {
@@ -713,6 +745,73 @@ function test_csv($chat_id) {
         }
         fclose($h);
         if (!empty($msg)) sendMessage($chat_id,$msg);
+    }
+}
+
+// ✅ IMPROVED CHANNEL POST HANDLING - FIXED
+if (isset($update['channel_post'])) {
+    $message = $update['channel_post'];
+    $message_id = $message['message_id'];
+    $chat_username = $message['chat']['username'] ?? '';
+    
+    error_log("📨 Channel post received from: @" . $chat_username);
+    
+    // Check if message is from your channel by username
+    if (strtolower($chat_username) == strtolower(str_replace('@', '', CHANNEL_ID))) {
+        error_log("✅ Message from correct channel: " . CHANNEL_ID);
+        
+        $text = '';
+        
+        // 1. First, try to get the caption (for photos, videos, documents)
+        if (isset($message['caption'])) {
+            $text = trim($message['caption']);
+            error_log("📝 Caption found: " . $text);
+        }
+        // 2. If no caption, try to get the text
+        elseif (isset($message['text'])) {
+            $text = trim($message['text']);
+            error_log("📝 Text found: " . $text);
+        }
+        // 3. If it's a document, use the file name
+        elseif (isset($message['document'])) {
+            $text = trim($message['document']['file_name']);
+            error_log("📁 Document found: " . $text);
+        }
+        // 4. If it's media without caption, use a placeholder
+        else {
+            $text = 'Uploaded Media - ' . date('d-m-Y H:i');
+            error_log("🖼️ Media without caption: " . $text);
+        }
+        
+        // Clean the text - remove extra spaces and special characters
+        $text = preg_replace('/\s+/', ' ', $text); // Multiple spaces to single space
+        $text = trim($text);
+        
+        // Finally, save it to the CSV
+        if (!empty($text) && strlen($text) > 2) {
+            error_log("💾 Attempting to save: " . $text);
+            
+            // Append to CSV
+            $entry = [$text, $message_id, date('d-m-Y'), ''];
+            $handle = fopen(CSV_FILE, "a");
+            if ($handle !== FALSE) {
+                fputcsv($handle, $entry);
+                fclose($handle);
+                error_log("✅ Successfully saved to CSV: " . $text);
+                
+                // Force reload cache
+                global $movie_cache, $movie_messages;
+                $movie_cache = [];
+                $movie_messages = [];
+                get_cached_movies(); // Reload cache
+            } else {
+                error_log("❌ Failed to open CSV file for writing");
+            }
+        } else {
+            error_log("❌ Empty or too short text, nothing to save");
+        }
+    } else {
+        error_log("❌ Message from unknown channel: @" . $chat_username);
     }
 }
 
