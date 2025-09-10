@@ -599,7 +599,7 @@ function send_daily_digest() {
             if (count($y_movies)>10) $msg .= "• ... and " . (count($y_movies)-10) . " more\n";
             $msg .= "\n🔥 Total: " . count($y_movies) . " movies";
             sendMessage($uid, $msg, null, 'HTML');
-        }
+    }
     }
 }
 
@@ -652,12 +652,39 @@ $update = json_decode(file_get_contents('php://input'), true);
 if ($update) {
     get_cached_movies();
 
+    // ✅ IMPROVED CHANNEL POST HANDLING - AUTOMATIC CSV SAVE
     if (isset($update['channel_post'])) {
         $message = $update['channel_post'];
         $message_id = $message['message_id'];
-        $text = isset($message['text']) ? $message['text'] : (isset($message['caption']) ? $message['caption'] : '');
-        if (!empty(trim($text))) {
-            append_movie($text, $message_id, date('d-m-Y'), '');
+        $chat_id = $message['chat']['id']; // This is your channel's ID
+
+        // Only process messages from your specific channel
+        if ($chat_id == CHANNEL_ID) {
+            $text = '';
+
+            // 1. First, try to get the caption (for photos, videos, documents)
+            if (isset($message['caption'])) {
+                $text = $message['caption'];
+            }
+            // 2. If no caption, try to get the text
+            elseif (isset($message['text'])) {
+                $text = $message['text'];
+            }
+            // 3. If it's a document, use the file name
+            elseif (isset($message['document'])) {
+                $text = $message['document']['file_name'];
+            }
+            // 4. If it's media without caption, use a placeholder
+            else {
+                $text = 'Uploaded Media - ' . date('d-m-Y H:i');
+            }
+
+            // Finally, save it to the CSV
+            if (!empty(trim($text))) {
+                append_movie($text, $message_id, date('d-m-Y'), '');
+                // Optional: Log success
+                error_log("✅ Channel Post Saved: " . $text);
+            }
         }
     }
 
