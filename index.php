@@ -34,7 +34,7 @@ if (!file_exists(STATS_FILE)) {
     file_put_contents(STATS_FILE, json_encode([
         'total_movies' => 0,
         'total_users' => 0,
-        'total_searches' => 0,
+        'total_seaches' => 0,
         'last_updated' => date('Y-m-d H:i:s')
     ]));
     @chmod(STATS_FILE, 0666);
@@ -562,6 +562,77 @@ function admin_stats($chat_id) {
 }
 
 // ==============================
+// Show CSV Data - NEW FUNCTION
+// ==============================
+function show_csv_data($chat_id, $show_all = false) {
+    if (!file_exists(CSV_FILE)) {
+        sendMessage($chat_id, "❌ CSV file not found.");
+        return;
+    }
+    
+    $handle = fopen(CSV_FILE, "r");
+    if ($handle === FALSE) {
+        sendMessage($chat_id, "❌ Error opening CSV file.");
+        return;
+    }
+    
+    // Skip header
+    fgetcsv($handle);
+    
+    $movies = [];
+    while (($row = fgetcsv($handle)) !== FALSE) {
+        if (count($row) >= 3) {
+            $movies[] = $row;
+        }
+    }
+    fclose($handle);
+    
+    if (empty($movies)) {
+        sendMessage($chat_id, "📊 CSV file is empty.");
+        return;
+    }
+    
+    // Reverse array to show latest first
+    $movies = array_reverse($movies);
+    
+    $limit = $show_all ? count($movies) : 10;
+    $movies = array_slice($movies, 0, $limit);
+    
+    $message = "📊 <b>CSV Movie Database</b>\n\n";
+    $message .= "📁 <b>Total Movies:</b> " . count($movies) . "\n";
+    if (!$show_all) {
+        $message .= "🔍 <i>Showing latest 10 entries</i>\n";
+        $message .= "📋 <i>Use '/checkcsv all' for full list</i>\n\n";
+    } else {
+        $message .= "📋 <i>Full database listing</i>\n\n";
+    }
+    
+    $i = 1;
+    foreach ($movies as $movie) {
+        $movie_name = $movie[0] ?? 'N/A';
+        $message_id = $movie[1] ?? 'N/A';
+        $date = $movie[2] ?? 'N/A';
+        
+        $message .= "<b>$i.</b> 🎬 <code>" . htmlspecialchars($movie_name) . "</code>\n";
+        $message .= "   📝 ID: <code>$message_id</code>\n";
+        $message .= "   📅 Date: <code>$date</code>\n\n";
+        
+        $i++;
+        
+        // Message too long hone par break karo
+        if (strlen($message) > 3000) {
+            sendMessage($chat_id, $message, null, 'HTML');
+            $message = "📊 <b>Continuing...</b>\n\n";
+        }
+    }
+    
+    $message .= "💾 <b>File:</b> <code>" . CSV_FILE . "</code>\n";
+    $message .= "⏰ <b>Last Updated:</b> " . date('Y-m-d H:i:s', filemtime(CSV_FILE));
+    
+    sendMessage($chat_id, $message, null, 'HTML');
+}
+
+// ==============================
 // Backups & daily digest
 // ==============================
 function auto_backup() {
@@ -599,7 +670,7 @@ function send_daily_digest() {
             if (count($y_movies)>10) $msg .= "• ... and " . (count($y_movies)-10) . " more\n";
             $msg .= "\n🔥 Total: " . count($y_movies) . " movies";
             sendMessage($uid, $msg, null, 'HTML');
-    }
+        }
     }
 }
 
@@ -730,7 +801,7 @@ if ($update) {
                 'last_active' => date('Y-m-d H:i:s'),
                 'points' => 0
             ];
-            $users_data['total_requests'] = ($users_data['total_requests'] ?? 0) + 1;
+                        $users_data['total_requests'] = ($users_data['total_requests'] ?? 0) + 1;
             file_put_contents(USERS_FILE, json_encode($users_data, JSON_PRETTY_PRINT));
             update_stats('total_users', 1);
         }
@@ -743,6 +814,11 @@ if ($update) {
             if ($command == '/checkdate') check_date($chat_id);
             elseif ($command == '/totalupload' || $command == '/totaluploads' || $command == '/TOTALUPLOAD') totalupload_controller($chat_id, 1);
             elseif ($command == '/testcsv') test_csv($chat_id);
+            // /checkcsv command - NEW
+            elseif ($command == '/checkcsv') {
+                $show_all = (isset($parts[1]) && strtolower($parts[1]) == 'all');
+                show_csv_data($chat_id, $show_all);
+            }
             elseif ($command == '/start') {
                 $welcome = "🎬 <b>Welcome to Entertainment Tadka!</b>\n\n";
                 $welcome .= "📢 <b>How to use this bot:</b>\n";
@@ -760,7 +836,7 @@ if ($update) {
             }
             elseif ($command == '/stats' && $user_id == 1080317415) admin_stats($chat_id);
             elseif ($command == '/help') {
-                $help = "🤖 <b>Entertainment Tadka Bot</b>\n\n📢 Join our channel: @EntertainmentTadka786\n\n📋 <b>Available Commands:</b>\n/start, /checkdate, /totalupload, /testcsv, /help\n\n🔍 <b>Simply type any movie name to search!</b>";
+                $help = "🤖 <b>Entertainment Tadka Bot</b>\n\n📢 Join our channel: @EntertainmentTadka786\n\n📋 <b>Available Commands:</b>\n/start, /checkdate, /totalupload, /testcsv, /checkcsv, /help\n\n🔍 <b>Simply type any movie name to search!</b>";
                 sendMessage($chat_id, $help, null, 'HTML');
             }
         } else if (!empty(trim($text))) {
@@ -885,6 +961,7 @@ if (!isset($update) || !$update) {
     echo "<li><code>/checkdate</code> - Date-wise stats</li>";
     echo "<li><code>/totalupload</code> - Upload statistics</li>";
     echo "<li><code>/testcsv</code> - View all movies</li>";
+    echo "<li><code>/checkcsv</code> - Check CSV data</li>";
     echo "<li><code>/help</code> - Help message</li>";
     echo "<li><code>/stats</code> - Admin statistics</li>";
     echo "</ul>";
