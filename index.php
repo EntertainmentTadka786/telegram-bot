@@ -6,7 +6,7 @@ error_reporting(E_ALL);
 
 // -------------------- CONFIG --------------------
 define('BOT_TOKEN', '8315381064:AAGk0FGVGmB8j5SjpBvW3rD3_kQHe_hyOWU');
-define('CHANNEL_ID', '@EntertainmentTadka786');
+define('CHANNEL_ID', '-1002831038104'); // ✅ CORRECTED: Numeric channel ID
 define('GROUP_CHANNEL_ID', '@EntertainmentTadka0786');
 define('CSV_FILE', 'movies.csv');
 define('USERS_FILE', 'users.json');
@@ -20,7 +20,7 @@ if (!file_exists(USERS_FILE)) {
     file_put_contents(USERS_FILE, json_encode([
         'users' => [], 
         'total_requests' => 0,
-        'message_logs' => []  // NEW: Message tracking
+        'message_logs' => []
     ]));
     @chmod(USERS_FILE, 0666);
 }
@@ -34,7 +34,7 @@ if (!file_exists(STATS_FILE)) {
     file_put_contents(STATS_FILE, json_encode([
         'total_movies' => 0,
         'total_users' => 0,
-        'total_seaches' => 0,
+        'total_searches' => 0,
         'last_updated' => date('Y-m-d H:i:s')
     ]));
     @chmod(STATS_FILE, 0666);
@@ -53,32 +53,29 @@ $waiting_users = array();
 // Time Check Function - NEW WITH SUNDAY OFF
 // ==============================
 function is_group_active_time() {
-    $current_day = date('w'); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    $current_day = date('w');
     $current_time = time();
     $current_hour = (int)date('H');
     $current_minute = (int)date('i');
     
     // ✅ SUNDAY COMPLETELY OFF
-    if ($current_day == 0) { // 0 = Sunday
+    if ($current_day == 0) {
         return false;
     }
     
     // Monday-Saturday: 10:00 AM to 6:30 PM
-    $start_time = 10;   // 10 AM
-    $end_time = 18;     // 6 PM
-    $end_minute = 30;   // 30 minutes
+    $start_time = 10;
+    $end_time = 18;
+    $end_minute = 30;
     
-    // Check if current time is between 10 AM and 6:30 PM
     if ($current_hour > $start_time && $current_hour < $end_time) {
         return true;
     }
     
-    // Check 10:00 AM exactly
     if ($current_hour == $start_time && $current_minute >= 0) {
         return true;
     }
     
-    // Check 6:30 PM exactly
     if ($current_hour == $end_time && $current_minute <= $end_minute) {
         return true;
     }
@@ -94,7 +91,6 @@ function send_group_opening_message() {
     
     $current_day = date('w');
     
-    // Sunday ko message mat bhejo
     if ($current_day == 0) return;
     
     if (date('H:i') == '10:00') {
@@ -114,13 +110,11 @@ function send_group_closing_message() {
     
     $current_day = date('w');
     
-    // Sunday ko message mat bhejo
     if ($current_day == 0) return;
     
     if (date('H:i') == '18:30') {
         $message = "⏰ <b>Group is now CLOSED!</b>\n\n";
         
-        // Kal Sunday hai ya nahi?
         $tomorrow_day = date('w', strtotime('+1 day'));
         if ($tomorrow_day == 0) {
             $message .= "🚫 <b>Tomorrow Sunday:</b> Full day closed\n";
@@ -212,13 +206,11 @@ function load_and_clean_csv($filename = CSV_FILE) {
         fclose($handle);
     }
 
-    // Update stats
     $stats = json_decode(file_get_contents(STATS_FILE), true);
     $stats['total_movies'] = count($data);
     $stats['last_updated'] = date('Y-m-d H:i:s');
     file_put_contents(STATS_FILE, json_encode($stats, JSON_PRETTY_PRINT));
 
-    // Re-write CSV
     $handle = fopen($filename, "w");
     fputcsv($handle, array('movie_name','message_id','date','video_path'));
     foreach ($data as $row) {
@@ -307,14 +299,11 @@ function answerCallbackQuery($callback_query_id, $text = null) {
 // DELIVERY LOGIC - SINGLE CHANNEL
 // ==============================
 function deliver_item_to_chat($chat_id, $item) {
-    // If numeric message_id -> forward to SINGLE CHANNEL
     if (!empty($item['message_id']) && is_numeric($item['message_id'])) {
-        // Sirf ek channel mein forward
         forwardMessage($chat_id, CHANNEL_ID, $item['message_id']);
         return true;
     }
 
-    // Fallback: send text info
     $text = "🎬 " . ($item['movie_name'] ?? 'Unknown') . "\n";
     $text .= "Ref: " . ($item['message_id_raw'] ?? 'N/A') . "\n";
     $text .= "Date: " . ($item['date'] ?? 'N/A') . "\n";
@@ -327,7 +316,7 @@ function deliver_item_to_chat($chat_id, $item) {
 // ==============================
 function get_all_movies_list() {
     $all = get_cached_movies();
-    return $all;  // ASCENDING ORDER (A-Z) KE LIYE
+    return $all;
 }
 
 function paginate_movies(array $all, int $page): array {
@@ -457,7 +446,6 @@ function detect_language($text) {
 }
 
 function send_multilingual_response($chat_id, $message_type, $language) {
-    // HINGLISH RESPONSES - UPDATED
     $responses = [
         'hindi'=>[
             'welcome' => "🎬 Boss, kis movie ki talash hai?",
@@ -488,13 +476,11 @@ function advanced_search($chat_id, $query, $user_id = null) {
     global $movie_messages, $waiting_users;
     $q = strtolower(trim($query));
     
-    // ✅ Check if query looks like a movie name
     if (strlen($q) < 2) {
         sendMessage($chat_id, "❌ Please enter at least 2 characters for search");
         return;
     }
     
-    // ✅ Filter out non-movie queries
     $invalid_keywords = ['vlc', 'audio', 'track', 'change', 'open', 'kar', 'me', 'hai', 'how', 'what', 'problem', 'issue', 'help'];
     $query_words = explode(' ', $q);
     
@@ -505,7 +491,6 @@ function advanced_search($chat_id, $query, $user_id = null) {
         }
     }
     
-    // Agar 50% se zyada words invalid hain toh
     if ($invalid_count > 0 && ($invalid_count / count($query_words)) > 0.5) {
         $help_msg = "🎬 <b>Please enter a movie name!</b>\n\n";
         $help_msg .= "🔍 <b>Examples of movie names:</b>\n";
@@ -576,7 +561,6 @@ function show_csv_data($chat_id, $show_all = false) {
         return;
     }
     
-    // Skip header
     fgetcsv($handle);
     
     $movies = [];
@@ -592,7 +576,6 @@ function show_csv_data($chat_id, $show_all = false) {
         return;
     }
     
-    // Reverse array to show latest first
     $movies = array_reverse($movies);
     
     $limit = $show_all ? count($movies) : 10;
@@ -619,7 +602,6 @@ function show_csv_data($chat_id, $show_all = false) {
         
         $i++;
         
-        // Message too long hone par break karo
         if (strlen($message) > 3000) {
             sendMessage($chat_id, $message, null, 'HTML');
             $message = "📊 <b>Continuing...</b>\n\n";
@@ -631,38 +613,6 @@ function show_csv_data($chat_id, $show_all = false) {
     
     sendMessage($chat_id, $message, null, 'HTML');
 }
-
-// ==============================
-// Test Channel Posts - TEMPORARY
-// ==============================
-function test_channel_save() {
-    $test_movies = [
-        "Metro In Dino (2025)",
-        "Metro In Dino 2025 WebRip 480p x265 HEVC 10bit Hindi ESubs",
-        "Metro In Dino (2025) Hindi 720p HEVC HDRip x265 AAC 5.1 ESubs",
-        "Metro In Dino (2025) Hindi 720p HDRip x264 AAC 5.1 ESubs",
-        "Metro In Dino (2025) Hindi 1080p HDRip x264 AAC 5.1 ESubs"
-    ];
-    
-    foreach ($test_movies as $movie) {
-        $entry = [$movie, rand(1000, 9999), date('d-m-Y'), ''];
-        $handle = fopen(CSV_FILE, "a");
-        if ($handle !== FALSE) {
-            fputcsv($handle, $entry);
-            fclose($handle);
-            error_log("✅ Test saved: " . $movie);
-        }
-    }
-    
-    // Force reload
-    global $movie_cache, $movie_messages;
-    $movie_cache = [];
-    $movie_messages = [];
-    get_cached_movies();
-}
-
-// Temporary: Uncomment to test
-// test_channel_save();
 
 // ==============================
 // Backups & daily digest
@@ -748,29 +698,65 @@ function test_csv($chat_id) {
     }
 }
 
-// ✅ Channel posts ko handle karo aur sirf main channel ka add karo
+// ✅ IMPROVED CHANNEL POST HANDLING - FIXED
 if (isset($update['channel_post'])) {
     $message = $update['channel_post'];
     $message_id = $message['message_id'];
-    $chat_username = $message['chat']['username'] ?? '';
-
-    // ✅ sirf tumhare channel @EntertainmentTadka786 ka data lo
-    if (strtolower($chat_username) === 'entertainmenttadka786') {
-
-        // caption/text nikal lo
+    $channel_id = $message['chat']['id']; // ✅ CORRECTED: Use numeric ID
+    
+    error_log("📨 Channel post received from ID: " . $channel_id);
+    
+    // ✅ Check if message is from your channel by NUMERIC ID
+    if ($channel_id == CHANNEL_ID) {
+        error_log("✅ Message from correct channel: " . CHANNEL_ID);
+        
         $text = '';
-        if (!empty($message['caption'])) {
-            $text = $message['caption'];
-        } elseif (!empty($message['text'])) {
-            $text = $message['text'];
+        
+        if (isset($message['caption'])) {
+            $text = trim($message['caption']);
+            error_log("📝 Caption found: " . $text);
         }
-
-        if (!empty($text)) {
-            append_movie($text, $message_id); // movies.csv me add karo
+        elseif (isset($message['text'])) {
+            $text = trim($message['text']);
+            error_log("📝 Text found: " . $text);
         }
+        elseif (isset($message['document'])) {
+            $text = trim($message['document']['file_name']);
+            error_log("📁 Document found: " . $text);
+        }
+        else {
+            $text = 'Uploaded Media - ' . date('d-m-Y H:i');
+            error_log("🖼️ Media without caption: " . $text);
+        }
+        
+        $text = preg_replace('/\s+/', ' ', $text);
+        $text = trim($text);
+        
+        if (!empty($text) && strlen($text) > 2) {
+            error_log("💾 Attempting to save: " . $text);
+            
+            $entry = [$text, $message_id, date('d-m-Y'), ''];
+            $handle = fopen(CSV_FILE, "a");
+            if ($handle !== FALSE) {
+                fputcsv($handle, $entry);
+                fclose($handle);
+                @chmod(CSV_FILE, 0666);
+                error_log("✅ Successfully saved to CSV: " . $text);
+                
+                global $movie_cache, $movie_messages;
+                $movie_cache = [];
+                $movie_messages = [];
+                get_cached_movies();
+            } else {
+                error_log("❌ Failed to open CSV file for writing");
+            }
+        } else {
+            error_log("❌ Empty or too short text, nothing to save");
+        }
+    } else {
+        error_log("❌ Message from unknown channel: " . $channel_id);
     }
 }
-
 
 // ==============================
 // Main update processing (webhook)
@@ -783,33 +769,27 @@ if ($update) {
     if (isset($update['channel_post'])) {
         $message = $update['channel_post'];
         $message_id = $message['message_id'];
-        $chat_id = $message['chat']['id']; // This is your channel's ID
+        $chat_id = $message['chat']['id'];
 
-        // Only process messages from your specific channel
+        // ✅ Only process messages from your specific channel by NUMERIC ID
         if ($chat_id == CHANNEL_ID) {
             $text = '';
 
-            // 1. First, try to get the caption (for photos, videos, documents)
             if (isset($message['caption'])) {
                 $text = $message['caption'];
             }
-            // 2. If no caption, try to get the text
             elseif (isset($message['text'])) {
                 $text = $message['text'];
             }
-            // 3. If it's a document, use the file name
             elseif (isset($message['document'])) {
                 $text = $message['document']['file_name'];
             }
-            // 4. If it's media without caption, use a placeholder
             else {
                 $text = 'Uploaded Media - ' . date('d-m-Y H:i');
             }
 
-            // Finally, save it to the CSV
             if (!empty(trim($text))) {
                 append_movie($text, $message_id, date('d-m-Y'), '');
-                // Optional: Log success
                 error_log("✅ Channel Post Saved: " . $text);
             }
         }
@@ -821,15 +801,13 @@ if ($update) {
         $user_id = $message['from']['id'];
         $text = isset($message['text']) ? $message['text'] : '';
 
-        // ✅ NEW: SUNDAY COMPLETE BLOCK
-        if (date('w') == 0) { // Sunday
+        if (date('w') == 0) {
             if ($chat_id == GROUP_CHANNEL_ID) {
                 sendMessage($chat_id, "🚫 <b>SUNDAY CLOSED!</b>\n\n📅 Aaj Sunday hai - Group complete day off hai\n\n🕙 Monday se fir open hoga: 10:00 AM to 6:30 PM\n\n📢 Join: @EntertainmentTadka786");
                 exit;
             }
         }
         
-        // ✅ Regular time check (Monday-Saturday)
         if ($chat_id == GROUP_CHANNEL_ID) {
             if (!is_group_active_time()) {
                 $current_time = date('h:i A');
@@ -857,7 +835,7 @@ if ($update) {
                 'last_active' => date('Y-m-d H:i:s'),
                 'points' => 0
             ];
-                        $users_data['total_requests'] = ($users_data['total_requests'] ?? 0) + 1;
+            $users_data['total_requests'] = ($users_data['total_requests'] ?? 0) + 1;
             file_put_contents(USERS_FILE, json_encode($users_data, JSON_PRETTY_PRINT));
             update_stats('total_users', 1);
         }
@@ -870,7 +848,6 @@ if ($update) {
             if ($command == '/checkdate') check_date($chat_id);
             elseif ($command == '/totalupload' || $command == '/totaluploads' || $command == '/TOTALUPLOAD') totalupload_controller($chat_id, 1);
             elseif ($command == '/testcsv') test_csv($chat_id);
-            // /checkcsv command - NEW
             elseif ($command == '/checkcsv') {
                 $show_all = (isset($parts[1]) && strtolower($parts[1]) == 'all');
                 show_csv_data($chat_id, $show_all);
@@ -975,13 +952,53 @@ if ($update) {
         }
     }
 
-    // Auto group messages
     send_group_opening_message();
     send_group_closing_message();
     send_sunday_status_message();
 
     if (date('H:i') == '00:00') auto_backup();
     if (date('H:i') == '08:00') send_daily_digest();
+}
+
+// ✅ TEMPORARY: Manual save test function
+if (isset($_GET['test_save'])) {
+    function manual_save_to_csv($movie_name, $message_id) {
+        $entry = [$movie_name, $message_id, date('d-m-Y'), ''];
+        $handle = fopen(CSV_FILE, "a");
+        if ($handle !== FALSE) {
+            fputcsv($handle, $entry);
+            fclose($handle);
+            @chmod(CSV_FILE, 0666);
+            error_log("✅ MANUALLY Saved: " . $movie_name);
+            return true;
+        }
+        return false;
+    }
+    
+    manual_save_to_csv("Metro In Dino (2025)", 1924);
+    manual_save_to_csv("Metro In Dino 2025 WebRip 480p x265 HEVC 10bit Hindi ESubs", 1925);
+    manual_save_to_csv("Metro In Dino (2025) Hindi 720p HEVC HDRip x265 AAC 5.1 ESubs", 1926);
+    manual_save_to_csv("Metro In Dino (2025) Hindi 720p HDRip x264 AAC 5.1 ESubs", 1927);
+    manual_save_to_csv("Metro In Dino (2025) Hindi 1080p HDRip x264 AAC 5.1 ESubs", 1928);
+    
+    echo "✅ All 5 movies manually save ho gayi!<br>";
+    echo "📊 <a href='?check_csv=1'>Check CSV</a> | ";
+    echo "<a href='?setwebhook=1'>Reset Webhook</a>";
+    exit;
+}
+
+// ✅ Check CSV content
+if (isset($_GET['check_csv'])) {
+    echo "<h3>CSV Content:</h3>";
+    if (file_exists(CSV_FILE)) {
+        $lines = file(CSV_FILE);
+        foreach ($lines as $line) {
+            echo htmlspecialchars($line) . "<br>";
+        }
+    } else {
+        echo "❌ CSV file not found!";
+    }
+    exit;
 }
 
 if (php_sapi_name() === 'cli' || isset($_GET['setwebhook'])) {
