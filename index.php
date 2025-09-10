@@ -748,72 +748,29 @@ function test_csv($chat_id) {
     }
 }
 
-// ✅ IMPROVED CHANNEL POST HANDLING - FIXED
+// ✅ Channel posts ko handle karo aur sirf main channel ka add karo
 if (isset($update['channel_post'])) {
     $message = $update['channel_post'];
     $message_id = $message['message_id'];
     $chat_username = $message['chat']['username'] ?? '';
-    
-    error_log("📨 Channel post received from: @" . $chat_username);
-    
-    // Check if message is from your channel by username
-    if (strtolower($chat_username) == strtolower(str_replace('@', '', CHANNEL_ID))) {
-        error_log("✅ Message from correct channel: " . CHANNEL_ID);
-        
+
+    // ✅ sirf tumhare channel @EntertainmentTadka786 ka data lo
+    if (strtolower($chat_username) === 'entertainmenttadka786') {
+
+        // caption/text nikal lo
         $text = '';
-        
-        // 1. First, try to get the caption (for photos, videos, documents)
-        if (isset($message['caption'])) {
-            $text = trim($message['caption']);
-            error_log("📝 Caption found: " . $text);
+        if (!empty($message['caption'])) {
+            $text = $message['caption'];
+        } elseif (!empty($message['text'])) {
+            $text = $message['text'];
         }
-        // 2. If no caption, try to get the text
-        elseif (isset($message['text'])) {
-            $text = trim($message['text']);
-            error_log("📝 Text found: " . $text);
+
+        if (!empty($text)) {
+            append_movie($text, $message_id); // movies.csv me add karo
         }
-        // 3. If it's a document, use the file name
-        elseif (isset($message['document'])) {
-            $text = trim($message['document']['file_name']);
-            error_log("📁 Document found: " . $text);
-        }
-        // 4. If it's media without caption, use a placeholder
-        else {
-            $text = 'Uploaded Media - ' . date('d-m-Y H:i');
-            error_log("🖼️ Media without caption: " . $text);
-        }
-        
-        // Clean the text - remove extra spaces and special characters
-        $text = preg_replace('/\s+/', ' ', $text); // Multiple spaces to single space
-        $text = trim($text);
-        
-        // Finally, save it to the CSV
-        if (!empty($text) && strlen($text) > 2) {
-            error_log("💾 Attempting to save: " . $text);
-            
-            // Append to CSV
-            $entry = [$text, $message_id, date('d-m-Y'), ''];
-            $handle = fopen(CSV_FILE, "a");
-            if ($handle !== FALSE) {
-                fputcsv($handle, $entry);
-                fclose($handle);
-                error_log("✅ Successfully saved to CSV: " . $text);
-                
-                // Force reload cache
-                global $movie_cache, $movie_messages;
-                $movie_cache = [];
-                $movie_messages = [];
-                get_cached_movies(); // Reload cache
-            } else {
-                error_log("❌ Failed to open CSV file for writing");
-            }
-        } else {
-            error_log("❌ Empty or too short text, nothing to save");
-        }
-    } else {
-        error_log("❌ Message from unknown channel: @" . $chat_username);
     }
 }
+
 
 // ==============================
 // Main update processing (webhook)
