@@ -17,7 +17,11 @@ define('ITEMS_PER_PAGE', 5);
 // ------------------------------------------------
 
 if (!file_exists(USERS_FILE)) {
-    file_put_contents(USERS_FILE, json_encode(['users' => [], 'total_requests' => 0]));
+    file_put_contents(USERS_FILE, json_encode([
+        'users' => [], 
+        'total_requests' => 0,
+        'message_logs' => []  // NEW: Message tracking
+    ]));
     @chmod(USERS_FILE, 0666);
 }
 
@@ -44,6 +48,110 @@ if (!file_exists(BACKUP_DIR)) {
 $movie_messages = array();
 $movie_cache = array();
 $waiting_users = array();
+
+// ==============================
+// Time Check Function - NEW WITH SUNDAY OFF
+// ==============================
+function is_group_active_time() {
+    $current_day = date('w'); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    $current_time = time();
+    $current_hour = (int)date('H');
+    $current_minute = (int)date('i');
+    
+    // ✅ SUNDAY COMPLETELY OFF
+    if ($current_day == 0) { // 0 = Sunday
+        return false;
+    }
+    
+    // Monday-Saturday: 10:00 AM to 6:30 PM
+    $start_time = 10;   // 10 AM
+    $end_time = 18;     // 6 PM
+    $end_minute = 30;   // 30 minutes
+    
+    // Check if current time is between 10 AM and 6:30 PM
+    if ($current_hour > $start_time && $current_hour < $end_time) {
+        return true;
+    }
+    
+    // Check 10:00 AM exactly
+    if ($current_hour == $start_time && $current_minute >= 0) {
+        return true;
+    }
+    
+    // Check 6:30 PM exactly
+    if ($current_hour == $end_time && $current_minute <= $end_minute) {
+        return true;
+    }
+    
+    return false;
+}
+
+// ==============================
+// Auto Group Message - NEW WITH SUNDAY
+// ==============================
+function send_group_opening_message() {
+    if (!defined('GROUP_CHANNEL_ID')) return;
+    
+    $current_day = date('w');
+    
+    // Sunday ko message mat bhejo
+    if ($current_day == 0) return;
+    
+    if (date('H:i') == '10:00') {
+        $message = "🌟 <b>Group is now OPEN!</b>\n\n";
+        $message .= "🕙 <b>Today's Timing:</b> 10:00 AM to 6:30 PM\n";
+        $message .= "🚫 <b>Sunday Closed:</b> Full day off\n";
+        $message .= "🎬 <b>Request movies here:</b> @EntertainmentTadka0786\n";
+        $message .= "📢 <b>Main channel:</b> @EntertainmentTadka786\n\n";
+        $message .= "⚠️ Group will close at 6:30 PM automatically";
+        
+        sendMessage(GROUP_CHANNEL_ID, $message, null, 'HTML');
+    }
+}
+
+function send_group_closing_message() {
+    if (!defined('GROUP_CHANNEL_ID')) return;
+    
+    $current_day = date('w');
+    
+    // Sunday ko message mat bhejo
+    if ($current_day == 0) return;
+    
+    if (date('H:i') == '18:30') {
+        $message = "⏰ <b>Group is now CLOSED!</b>\n\n";
+        
+        // Kal Sunday hai ya nahi?
+        $tomorrow_day = date('w', strtotime('+1 day'));
+        if ($tomorrow_day == 0) {
+            $message .= "🚫 <b>Tomorrow Sunday:</b> Full day closed\n";
+        } else {
+            $message .= "🕙 <b>Will open tomorrow at:</b> 10:00 AM\n";
+        }
+        
+        $message .= "🎬 <b>You can still use bot:</b> @EntertainmentTadkaBot\n";
+        $message .= "📢 <b>Main channel:</b> @EntertainmentTadka786\n\n";
+        $message .= "😴 Goodnight! See you tomorrow!";
+        
+        sendMessage(GROUP_CHANNEL_ID, $message, null, 'HTML');
+    }
+}
+
+function send_sunday_status_message() {
+    if (!defined('GROUP_CHANNEL_ID')) return;
+    
+    if (date('w') == 0 && date('H:i') == '10:00') {
+        $message = "🚫 <b>SUNDAY CLOSED NOTICE</b>\n\n";
+        $message .= "📅 Aaj Sunday hai - Group complete day off hai\n\n";
+        $message .= "🕙 <b>Regular Timing:</b>\n";
+        $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
+        $message .= "• Sunday: Closed\n\n";
+        $message .= "🎬 Bot available hai: @EntertainmentTadkaBot\n";
+        $message .= "📢 Movies channel: @EntertainmentTadka786\n\n";
+        $message .= "😊 Enjoy your Sunday!";
+        
+        sendMessage(GROUP_CHANNEL_ID, $message, null, 'HTML');
+    }
+}
 
 // ==============================
 // Stats
@@ -154,7 +262,6 @@ function apiRequest($method, $params = array(), $is_multipart = false) {
             error_log("CURL ERROR: " . curl_error($ch));
         }
         curl_close($ch);
-        return $res;
     } else {
         $options = array(
             'http' => array(
@@ -355,13 +462,13 @@ function send_multilingual_response($chat_id, $message_type, $language) {
         'hindi'=>[
             'welcome' => "🎬 Boss, kis movie ki talash hai?",
             'found' => "✅ Mil gayi! Movie forward ho rahi hai...",
-            'not_found' => "😔 Yeh movie abhi available nahi hai!\n\n📝 Aap ise request kar sakte hain: @EntertainmentTadka7860\n\n🔔 Jab bhi yeh add hogi, main automatically bhej dunga!",
+            'not_found' => "😔 Yeh movie abhi available nahi hai!\n\n📝 Aap ise request kar sakte hain: @EntertainmentTadka0786\n\n🔔 Jab bhi yeh add hogi, main automatically bhej dunga!",
             'searching' => "🔍 Dhoondh raha hoon... Zara wait karo"
         ],
         'english'=>[
             'welcome' => "🎬 Boss, which movie are you looking for?",
             'found' => "✅ Found it! Forwarding the movie...",
-            'not_found' => "😔 This movie isn't available yet!\n\n📝 You can request it here: @EntertainmentTadka7860\n\n🔔 I'll send it automatically once it's added!",
+            'not_found' => "😔 This movie isn't available yet!\n\n📝 You can request it here: @EntertainmentTadka0786\n\n🔔 I'll send it automatically once it's added!",
             'searching' => "🔍 Searching... Please wait"
         ]
     ];
@@ -405,7 +512,7 @@ function advanced_search($chat_id, $query, $user_id = null) {
         $help_msg .= "• kgf\n• pushpa\n• avengers\n• hindi movie\n• spider-man\n\n";
         $help_msg .= "❌ <i>Technical queries like 'vlc', 'audio track', etc. are not movie names.</i>\n\n";
         $help_msg .= "📢 Join: @EntertainmentTadka786\n";
-        $help_msg .= "💬 Help: @EntertainmentTadka7860";
+        $help_msg .= "💬 Help: @EntertainmentTadka0786";
         sendMessage($chat_id, $help_msg, null, 'HTML');
         return;
     }
@@ -560,6 +667,32 @@ if ($update) {
         $user_id = $message['from']['id'];
         $text = isset($message['text']) ? $message['text'] : '';
 
+        // ✅ NEW: SUNDAY COMPLETE BLOCK
+        if (date('w') == 0) { // Sunday
+            if ($chat_id == GROUP_CHANNEL_ID) {
+                sendMessage($chat_id, "🚫 <b>SUNDAY CLOSED!</b>\n\n📅 Aaj Sunday hai - Group complete day off hai\n\n🕙 Monday se fir open hoga: 10:00 AM to 6:30 PM\n\n📢 Join: @EntertainmentTadka786");
+                exit;
+            }
+        }
+        
+        // ✅ Regular time check (Monday-Saturday)
+        if ($chat_id == GROUP_CHANNEL_ID) {
+            if (!is_group_active_time()) {
+                $current_time = date('h:i A');
+                $current_day = date('l');
+                
+                $message = "⏰ <b>Group is closed now!</b>\n\n";
+                $message .= "🕙 <b>Opening Hours:</b>\n";
+                $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
+                $message .= "• Sunday: Closed\n\n";
+                $message .= "📅 Today: $current_day\n";
+                $message .= "⏰ Current time: $current_time";
+                
+                sendMessage($chat_id, $message, null, 'HTML');
+                exit;
+            }
+        }
+
         $users_data = json_decode(file_get_contents(USERS_FILE), true);
         if (!isset($users_data['users'][$user_id])) {
             $users_data['users'][$user_id] = [
@@ -594,7 +727,7 @@ if ($update) {
                 $welcome .= "❌ <b>Don't type:</b>\n";
                 $welcome .= "• Technical questions\n• Player instructions\n• Non-movie queries\n\n";
                 $welcome .= "📢 Join: @EntertainmentTadka786\n";
-                $welcome .= "💬 Request/Help: @EntertainmentTadka7860";
+                $welcome .= "💬 Request/Help: @EntertainmentTadka0786";
                 sendMessage($chat_id, $welcome, null, 'HTML');
                 update_user_points($user_id, 'daily_login');
             }
@@ -682,6 +815,11 @@ if ($update) {
             answerCallbackQuery($query['id'], "❌ Movie not available");
         }
     }
+
+    // Auto group messages
+    send_group_opening_message();
+    send_group_closing_message();
+    send_sunday_status_message();
 
     if (date('H:i') == '00:00') auto_backup();
     if (date('H:i') == '08:00') send_daily_digest();
