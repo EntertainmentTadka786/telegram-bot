@@ -6,8 +6,8 @@ error_reporting(E_ALL);
 
 // -------------------- CONFIG --------------------
 define('BOT_TOKEN', '8315381064:AAGk0FGVGmB8j5SjpBvW3rD3_kQHe_hyOWU');
-define('CHANNEL_ID', '-1002831038104'); // ✅ CORRECTED: Numeric channel ID
-define('GROUP_CHANNEL_ID', '@EntertainmentTadka0786');
+define('CHANNEL_ID', '-1002831038104');
+define('GROUP_CHANNEL_ID', '-1002831038104');
 define('CSV_FILE', 'movies.csv');
 define('USERS_FILE', 'users.json');
 define('STATS_FILE', 'bot_stats.json');
@@ -16,12 +16,9 @@ define('CACHE_EXPIRY', 300);
 define('ITEMS_PER_PAGE', 5);
 // ------------------------------------------------
 
+// File initialization
 if (!file_exists(USERS_FILE)) {
-    file_put_contents(USERS_FILE, json_encode([
-        'users' => [], 
-        'total_requests' => 0,
-        'message_logs' => []
-    ]));
+    file_put_contents(USERS_FILE, json_encode(['users' => [], 'total_requests' => 0, 'message_logs' => []]));
     @chmod(USERS_FILE, 0666);
 }
 
@@ -32,9 +29,9 @@ if (!file_exists(CSV_FILE)) {
 
 if (!file_exists(STATS_FILE)) {
     file_put_contents(STATS_FILE, json_encode([
-        'total_movies' => 0,
-        'total_users' => 0,
-        'total_searches' => 0,
+        'total_movies' => 0, 
+        'total_users' => 0, 
+        'total_searches' => 0, 
         'last_updated' => date('Y-m-d H:i:s')
     ]));
     @chmod(STATS_FILE, 0666);
@@ -50,20 +47,17 @@ $movie_cache = array();
 $waiting_users = array();
 
 // ==============================
-// Time Check Function - NEW WITH SUNDAY OFF
+// Time Check Function
 // ==============================
 function is_group_active_time() {
     $current_day = date('w');
-    $current_time = time();
     $current_hour = (int)date('H');
     $current_minute = (int)date('i');
     
-    // ✅ SUNDAY COMPLETELY OFF
     if ($current_day == 0) {
         return false;
     }
     
-    // Monday-Saturday: 10:00 AM to 6:30 PM
     $start_time = 10;
     $end_time = 18;
     $end_minute = 30;
@@ -84,21 +78,69 @@ function is_group_active_time() {
 }
 
 // ==============================
-// Auto Group Message - NEW WITH SUNDAY
+// Group Timing Restriction Function
+// ==============================
+function check_group_timing_restriction($chat_id) {
+    $current_day = date('w');
+    $current_hour = (int)date('H');
+    $current_minute = (int)date('i');
+    
+    if ($current_day == 0) {
+        $message = "🚫 SUNDAY CLOSED NOTICE\n\n";
+        $message .= "📅 Aaj Sunday hai - Group complete day off hai\n\n";
+        $message .= "🕙 Regular Timing:\n";
+        $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
+        $message .= "• Sunday: Closed\n\n";
+        $message .= "🎬 Bot available hai: @EntertainmentTadkaBot\n";
+        $message .= "📢 Movies channel: @EntertainmentTadka786\n\n";
+        $message .= "😊 Enjoy your Sunday!";
+        
+        sendMessage($chat_id, $message, null, 'HTML');
+        return true;
+    }
+    
+    $start_time = 10;
+    $end_time = 18;
+    $end_minute = 30;
+    
+    if ($current_hour < $start_time || ($current_hour == $end_time && $current_minute > $end_minute) || $current_hour > $end_time) {
+        $next_open_time = "tomorrow at 10:00 AM";
+        if ($current_day == 6) {
+            $next_open_time = "Monday at 10:00 AM";
+        }
+        
+        $message = "⏰ Group is currently CLOSED!\n\n";
+        $message .= "🕙 Opening Hours:\n";
+        $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
+        $message .= "• Sunday: Closed\n\n";
+        $message .= "📅 Aaj: " . date('l') . "\n";
+        $message .= "⏰ Time now: " . date('h:i A') . "\n\n";
+        $message .= "🔜 Group will open $next_open_time\n\n";
+        $message .= "🎬 Aap bot use kar sakte hain: @EntertainmentTadkaBot\n";
+        $message .= "📢 Movies channel: @EntertainmentTadka786";
+        
+        sendMessage($chat_id, $message, null, 'HTML');
+        return true;
+    }
+    
+    return false;
+}
+
+// ==============================
+// Auto Group Message
 // ==============================
 function send_group_opening_message() {
     if (!defined('GROUP_CHANNEL_ID')) return;
     
     $current_day = date('w');
-    
     if ($current_day == 0) return;
     
     if (date('H:i') == '10:00') {
-        $message = "🌟 <b>Group is now OPEN!</b>\n\n";
-        $message .= "🕙 <b>Today's Timing:</b> 10:00 AM to 6:30 PM\n";
-        $message .= "🚫 <b>Sunday Closed:</b> Full day off\n";
-        $message .= "🎬 <b>Request movies here:</b> @EntertainmentTadka0786\n";
-        $message .= "📢 <b>Main channel:</b> @EntertainmentTadka786\n\n";
+        $message = "🌟 Group is now OPEN!\n\n";
+        $message .= "🕙 Today's Timing: 10:00 AM to 6:30 PM\n";
+        $message .= "🚫 Sunday Closed: Full day off\n";
+        $message .= "🎬 Request movies here: @EntertainmentTadka0786\n";
+        $message .= "📢 Main channel: @EntertainmentTadka786\n\n";
         $message .= "⚠️ Group will close at 6:30 PM automatically";
         
         sendMessage(GROUP_CHANNEL_ID, $message, null, 'HTML');
@@ -109,21 +151,20 @@ function send_group_closing_message() {
     if (!defined('GROUP_CHANNEL_ID')) return;
     
     $current_day = date('w');
-    
     if ($current_day == 0) return;
     
     if (date('H:i') == '18:30') {
-        $message = "⏰ <b>Group is now CLOSED!</b>\n\n";
+        $message = "⏰ Group is now CLOSED!\n\n";
         
         $tomorrow_day = date('w', strtotime('+1 day'));
         if ($tomorrow_day == 0) {
-            $message .= "🚫 <b>Tomorrow Sunday:</b> Full day closed\n";
+            $message .= "🚫 Tomorrow Sunday: Full day closed\n";
         } else {
-            $message .= "🕙 <b>Will open tomorrow at:</b> 10:00 AM\n";
+            $message .= "🕙 Will open tomorrow at: 10:00 AM\n";
         }
         
-        $message .= "🎬 <b>You can still use bot:</b> @EntertainmentTadkaBot\n";
-        $message .= "📢 <b>Main channel:</b> @EntertainmentTadka786\n\n";
+        $message .= "🎬 You can still use bot: @EntertainmentTadkaBot\n";
+        $message .= "📢 Main channel: @EntertainmentTadka786\n\n";
         $message .= "😴 Goodnight! See you tomorrow!";
         
         sendMessage(GROUP_CHANNEL_ID, $message, null, 'HTML');
@@ -134,9 +175,9 @@ function send_sunday_status_message() {
     if (!defined('GROUP_CHANNEL_ID')) return;
     
     if (date('w') == 0 && date('H:i') == '10:00') {
-        $message = "🚫 <b>SUNDAY CLOSED NOTICE</b>\n\n";
+        $message = "🚫 SUNDAY CLOSED NOTICE\n\n";
         $message .= "📅 Aaj Sunday hai - Group complete day off hai\n\n";
-        $message .= "🕙 <b>Regular Timing:</b>\n";
+        $message .= "🕙 Regular Timing:\n";
         $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
         $message .= "• Sunday: Closed\n\n";
         $message .= "🎬 Bot available hai: @EntertainmentTadkaBot\n";
@@ -218,7 +259,6 @@ function load_and_clean_csv($filename = CSV_FILE) {
     }
     fclose($handle);
 
-    error_log("✅ CSV loaded and cleaned - " . count($data) . " movies");
     return $data;
 }
 
@@ -368,10 +408,10 @@ function totalupload_controller($chat_id, $page = 1) {
     $pg = paginate_movies($all, (int)$page);
     forward_page_movies($chat_id, $pg['slice']);
 
-    $title = "📊 <b>Total Uploads</b>\n";
+    $title = "📊 Total Uploads\n";
     $title .= "• Page {$pg['page']}/{$pg['total_pages']}\n";
     $title .= "• Showing: " . count($pg['slice']) . " of {$pg['total']}\n\n";
-    $title .= "➡️ Navigate with buttons below or tap <b>View Movie</b> to re-send current page.";
+    $title .= "➡️ Navigate with buttons below or tap View Movie to re-send current page.";
 
     $kb = build_totalupload_keyboard($pg['page'], $pg['total_pages']);
     sendMessage($chat_id, $title, $kb, 'HTML');
@@ -492,10 +532,10 @@ function advanced_search($chat_id, $query, $user_id = null) {
     }
     
     if ($invalid_count > 0 && ($invalid_count / count($query_words)) > 0.5) {
-        $help_msg = "🎬 <b>Please enter a movie name!</b>\n\n";
-        $help_msg .= "🔍 <b>Examples of movie names:</b>\n";
+        $help_msg = "🎬 Please enter a movie name!\n\n";
+        $help_msg .= "🔍 Examples of movie names:\n";
         $help_msg .= "• kgf\n• pushpa\n• avengers\n• hindi movie\n• spider-man\n\n";
-        $help_msg .= "❌ <i>Technical queries like 'vlc', 'audio track', etc. are not movie names.</i>\n\n";
+        $help_msg .= "❌ Technical queries like 'vlc', 'audio track', etc. are not movie names.\n\n";
         $help_msg .= "📢 Join: @EntertainmentTadka786\n";
         $help_msg .= "💬 Help: @EntertainmentTadka0786";
         sendMessage($chat_id, $help_msg, null, 'HTML');
@@ -534,20 +574,20 @@ function admin_stats($chat_id) {
     $stats = get_stats();
     $users_data = json_decode(file_get_contents(USERS_FILE), true);
     $total_users = count($users_data['users'] ?? []);
-    $msg = "📊 <b>Bot Statistics</b>\n\n";
+    $msg = "📊 Bot Statistics\n\n";
     $msg .= "🎬 Total Movies: " . ($stats['total_movies'] ?? 0) . "\n";
     $msg .= "👥 Total Users: " . $total_users . "\n";
     $msg .= "🔍 Total Searches: " . ($stats['total_searches'] ?? 0) . "\n";
     $msg .= "🕒 Last Updated: " . ($stats['last_updated'] ?? 'N/A') . "\n\n";
     $csv_data = load_and_clean_csv();
     $recent = array_slice($csv_data, -5);
-    $msg .= "📈 <b>Recent Uploads:</b>\n";
+    $msg .= "📈 Recent Uploads:\n";
     foreach ($recent as $r) $msg .= "• " . $r['movie_name'] . " (" . $r['date'] . ")\n";
     sendMessage($chat_id, $msg, null, 'HTML');
 }
 
 // ==============================
-// Show CSV Data - NEW FUNCTION
+// Show CSV Data
 // ==============================
 function show_csv_data($chat_id, $show_all = false) {
     if (!file_exists(CSV_FILE)) {
@@ -581,13 +621,13 @@ function show_csv_data($chat_id, $show_all = false) {
     $limit = $show_all ? count($movies) : 10;
     $movies = array_slice($movies, 0, $limit);
     
-    $message = "📊 <b>CSV Movie Database</b>\n\n";
-    $message .= "📁 <b>Total Movies:</b> " . count($movies) . "\n";
+    $message = "📊 CSV Movie Database\n\n";
+    $message .= "📁 Total Movies: " . count($movies) . "\n";
     if (!$show_all) {
-        $message .= "🔍 <i>Showing latest 10 entries</i>\n";
-        $message .= "📋 <i>Use '/checkcsv all' for full list</i>\n\n";
+        $message .= "🔍 Showing latest 10 entries\n";
+        $message .= "📋 Use '/checkcsv all' for full list\n\n";
     } else {
-        $message .= "📋 <i>Full database listing</i>\n\n";
+        $message .= "📋 Full database listing\n\n";
     }
     
     $i = 1;
@@ -596,20 +636,20 @@ function show_csv_data($chat_id, $show_all = false) {
         $message_id = $movie[1] ?? 'N/A';
         $date = $movie[2] ?? 'N/A';
         
-        $message .= "<b>$i.</b> 🎬 <code>" . htmlspecialchars($movie_name) . "</code>\n";
-        $message .= "   📝 ID: <code>$message_id</code>\n";
-        $message .= "   📅 Date: <code>$date</code>\n\n";
+        $message .= "$i. 🎬 " . htmlspecialchars($movie_name) . "\n";
+        $message .= "   📝 ID: $message_id\n";
+        $message .= "   📅 Date: $date\n\n";
         
         $i++;
         
         if (strlen($message) > 3000) {
             sendMessage($chat_id, $message, null, 'HTML');
-            $message = "📊 <b>Continuing...</b>\n\n";
+            $message = "📊 Continuing...\n\n";
         }
     }
     
-    $message .= "💾 <b>File:</b> <code>" . CSV_FILE . "</code>\n";
-    $message .= "⏰ <b>Last Updated:</b> " . date('Y-m-d H:i:s', filemtime(CSV_FILE));
+    $message .= "💾 File: " . CSV_FILE . "\n";
+    $message .= "⏰ Last Updated: " . date('Y-m-d H:i:s', filemtime(CSV_FILE));
     
     sendMessage($chat_id, $message, null, 'HTML');
 }
@@ -645,7 +685,7 @@ function send_daily_digest() {
     if (!empty($y_movies)) {
         $users_data = json_decode(file_get_contents(USERS_FILE), true);
         foreach ($users_data['users'] as $uid => $ud) {
-            $msg = "📅 <b>Daily Movie Digest</b>\n\n";
+            $msg = "📅 Daily Movie Digest\n\n";
             $msg .= "📢 Join our channel: @EntertainmentTadka786\n\n";
             $msg .= "🎬 Yesterday's Uploads (" . $yesterday . "):\n";
             foreach (array_slice($y_movies,0,10) as $m) $msg .= "• " . $m . "\n";
@@ -668,10 +708,10 @@ function check_date($chat_id) {
         fclose($h);
     }
     krsort($date_counts);
-    $msg = "📅 <b>Movies Upload Record</b>\n\n";
+    $msg = "📅 Movies Upload Record\n\n";
     $total_days=0; $total_movies=0;
     foreach ($date_counts as $date=>$count) { $msg .= "➡️ $date: $count movies\n"; $total_days++; $total_movies += $count; }
-    $msg .= "\n📊 <b>Summary:</b>\n";
+    $msg .= "\n📊 Summary:\n";
     $msg .= "• Total Days: $total_days\n• Total Movies: $total_movies\n• Average per day: " . round($total_movies / max(1,$total_days),2);
     sendMessage($chat_id,$msg,null,'HTML');
 }
@@ -698,66 +738,6 @@ function test_csv($chat_id) {
     }
 }
 
-// ✅ IMPROVED CHANNEL POST HANDLING - FIXED
-if (isset($update['channel_post'])) {
-    $message = $update['channel_post'];
-    $message_id = $message['message_id'];
-    $channel_id = $message['chat']['id']; // ✅ CORRECTED: Use numeric ID
-    
-    error_log("📨 Channel post received from ID: " . $channel_id);
-    
-    // ✅ Check if message is from your channel by NUMERIC ID
-    if ($channel_id == CHANNEL_ID) {
-        error_log("✅ Message from correct channel: " . CHANNEL_ID);
-        
-        $text = '';
-        
-        if (isset($message['caption'])) {
-            $text = trim($message['caption']);
-            error_log("📝 Caption found: " . $text);
-        }
-        elseif (isset($message['text'])) {
-            $text = trim($message['text']);
-            error_log("📝 Text found: " . $text);
-        }
-        elseif (isset($message['document'])) {
-            $text = trim($message['document']['file_name']);
-            error_log("📁 Document found: " . $text);
-        }
-        else {
-            $text = 'Uploaded Media - ' . date('d-m-Y H:i');
-            error_log("🖼️ Media without caption: " . $text);
-        }
-        
-        $text = preg_replace('/\s+/', ' ', $text);
-        $text = trim($text);
-        
-        if (!empty($text) && strlen($text) > 2) {
-            error_log("💾 Attempting to save: " . $text);
-            
-            $entry = [$text, $message_id, date('d-m-Y'), ''];
-            $handle = fopen(CSV_FILE, "a");
-            if ($handle !== FALSE) {
-                fputcsv($handle, $entry);
-                fclose($handle);
-                @chmod(CSV_FILE, 0666);
-                error_log("✅ Successfully saved to CSV: " . $text);
-                
-                global $movie_cache, $movie_messages;
-                $movie_cache = [];
-                $movie_messages = [];
-                get_cached_movies();
-            } else {
-                error_log("❌ Failed to open CSV file for writing");
-            }
-        } else {
-            error_log("❌ Empty or too short text, nothing to save");
-        }
-    } else {
-        error_log("❌ Message from unknown channel: " . $channel_id);
-    }
-}
-
 // ==============================
 // Main update processing (webhook)
 // ==============================
@@ -765,13 +745,12 @@ $update = json_decode(file_get_contents('php://input'), true);
 if ($update) {
     get_cached_movies();
 
-    // ✅ IMPROVED CHANNEL POST HANDLING - AUTOMATIC CSV SAVE
+    // Channel post handling
     if (isset($update['channel_post'])) {
         $message = $update['channel_post'];
         $message_id = $message['message_id'];
         $chat_id = $message['chat']['id'];
 
-        // ✅ Only process messages from your specific channel by NUMERIC ID
         if ($chat_id == CHANNEL_ID) {
             $text = '';
 
@@ -790,7 +769,6 @@ if ($update) {
 
             if (!empty(trim($text))) {
                 append_movie($text, $message_id, date('d-m-Y'), '');
-                error_log("✅ Channel Post Saved: " . $text);
             }
         }
     }
@@ -801,30 +779,13 @@ if ($update) {
         $user_id = $message['from']['id'];
         $text = isset($message['text']) ? $message['text'] : '';
 
-        if (date('w') == 0) {
-            if ($chat_id == GROUP_CHANNEL_ID) {
-                sendMessage($chat_id, "🚫 <b>SUNDAY CLOSED!</b>\n\n📅 Aaj Sunday hai - Group complete day off hai\n\n🕙 Monday se fir open hoga: 10:00 AM to 6:30 PM\n\n📢 Join: @EntertainmentTadka786");
+        // Group message restriction check
+        if ($chat_id < 0) {
+            if (check_group_timing_restriction($chat_id)) {
                 exit;
             }
         }
         
-        if ($chat_id == GROUP_CHANNEL_ID) {
-            if (!is_group_active_time()) {
-                $current_time = date('h:i A');
-                $current_day = date('l');
-                
-                $message = "⏰ <b>Group is closed now!</b>\n\n";
-                $message .= "🕙 <b>Opening Hours:</b>\n";
-                $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
-                $message .= "• Sunday: Closed\n\n";
-                $message .= "📅 Today: $current_day\n";
-                $message .= "⏰ Current time: $current_time";
-                
-                sendMessage($chat_id, $message, null, 'HTML');
-                exit;
-            }
-        }
-
         $users_data = json_decode(file_get_contents(USERS_FILE), true);
         if (!isset($users_data['users'][$user_id])) {
             $users_data['users'][$user_id] = [
@@ -853,14 +814,14 @@ if ($update) {
                 show_csv_data($chat_id, $show_all);
             }
             elseif ($command == '/start') {
-                $welcome = "🎬 <b>Welcome to Entertainment Tadka!</b>\n\n";
-                $welcome .= "📢 <b>How to use this bot:</b>\n";
+                $welcome = "🎬 Welcome to Entertainment Tadka!\n\n";
+                $welcome .= "📢 How to use this bot:\n";
                 $welcome .= "• Simply type any movie name\n";
                 $welcome .= "• Use English or Hindi\n";
                 $welcome .= "• Partial names also work\n\n";
-                $welcome .= "🔍 <b>Examples:</b>\n";
+                $welcome .= "🔍 Examples:\n";
                 $welcome .= "• kgf\n• pushpa\n• avengers\n• hindi movie\n• spider-man\n\n";
-                $welcome .= "❌ <b>Don't type:</b>\n";
+                $welcome .= "❌ Don't type:\n";
                 $welcome .= "• Technical questions\n• Player instructions\n• Non-movie queries\n\n";
                 $welcome .= "📢 Join: @EntertainmentTadka786\n";
                 $welcome .= "💬 Request/Help: @EntertainmentTadka0786";
@@ -869,7 +830,7 @@ if ($update) {
             }
             elseif ($command == '/stats' && $user_id == 1080317415) admin_stats($chat_id);
             elseif ($command == '/help') {
-                $help = "🤖 <b>Entertainment Tadka Bot</b>\n\n📢 Join our channel: @EntertainmentTadka786\n\n📋 <b>Available Commands:</b>\n/start, /checkdate, /totalupload, /testcsv, /checkcsv, /help\n\n🔍 <b>Simply type any movie name to search!</b>";
+                $help = "🤖 Entertainment Tadka Bot\n\n📢 Join our channel: @EntertainmentTadka786\n\n📋 Available Commands:\n/start, /checkdate, /totalupload, /testcsv, /checkcsv, /help\n\n🔍 Simply type any movie name to search!";
                 sendMessage($chat_id, $help, null, 'HTML');
             }
         } else if (!empty(trim($text))) {
@@ -960,7 +921,7 @@ if ($update) {
     if (date('H:i') == '08:00') send_daily_digest();
 }
 
-// ✅ TEMPORARY: Manual save test function
+// Manual save test function
 if (isset($_GET['test_save'])) {
     function manual_save_to_csv($movie_name, $message_id) {
         $entry = [$movie_name, $message_id, date('d-m-Y'), ''];
@@ -969,7 +930,6 @@ if (isset($_GET['test_save'])) {
             fputcsv($handle, $entry);
             fclose($handle);
             @chmod(CSV_FILE, 0666);
-            error_log("✅ MANUALLY Saved: " . $movie_name);
             return true;
         }
         return false;
@@ -987,7 +947,7 @@ if (isset($_GET['test_save'])) {
     exit;
 }
 
-// ✅ Check CSV content
+// Check CSV content
 if (isset($_GET['check_csv'])) {
     echo "<h3>CSV Content:</h3>";
     if (file_exists(CSV_FILE)) {
@@ -1037,23 +997,6 @@ if (!isset($update) || !$update) {
     echo "<li><code>/checkcsv</code> - Check CSV data</li>";
     echo "<li><code>/help</code> - Help message</li>";
     echo "<li><code>/stats</code> - Admin statistics</li>";
-    echo "</ul>";
-    echo "<h3>📊 File Status</h3>";
-    echo "<ul>";
-    echo "<li>CSV File: " . (is_writable(CSV_FILE) ? "✅ Writable" : "❌ Not Writable") . "</li>";
-    echo "<li>Users File: " . (is_writable(USERS_FILE) ? "✅ Writable" : "❌ Not Writable") . "</li>";
-    echo "<li>Stats File: " . (is_writable(STATS_FILE) ? "✅ Writable" : "❌ Not Writable") . "</li>";
-    echo "</ul>";
-    echo "<h3>🌟 Special Features</h3>";
-    echo "<ul>";
-    echo "<li>🤖 AI-Powered Search</li>";
-    echo "<li>🔔 Smart Notifications</li>";
-    echo "<li>📊 Advanced Analytics</li>";
-    echo "<li>🌐 Multi-Language Support</li>";
-    echo "<li>⚡ Smart Caching</li>";
-    echo "<li>🛡️ Auto-Backup System</li>";
-    echo "<li>🎮 User Points System</li>";
-    echo "<li>📅 Daily Digest</li>";
     echo "</ul>";
 }
 ?>
