@@ -279,7 +279,7 @@ function load_movies_from_csv() {
 }
 
 // ==============================
-// Telegram API helpers
+// Telegram API helpers - UPDATED
 // ==============================
 function apiRequest($method, $params = array(), $is_multipart = false) {
     $url = "https://api.telegram.org/bot" . BOT_TOKEN . "/" . $method;
@@ -321,6 +321,14 @@ function sendMessage($chat_id, $text, $reply_markup = null, $parse_mode = null) 
     apiRequest('sendMessage', $data);
 }
 
+function copyMessage($chat_id, $from_chat_id, $message_id) {
+    return apiRequest('copyMessage', [
+        'chat_id' => $chat_id,
+        'from_chat_id' => $from_chat_id,
+        'message_id' => $message_id
+    ]);
+}
+
 function forwardMessage($chat_id, $from_chat_id, $message_id) {
     return apiRequest('forwardMessage', [
         'chat_id' => $chat_id,
@@ -336,11 +344,12 @@ function answerCallbackQuery($callback_query_id, $text = null) {
 }
 
 // ==============================
-// DELIVERY LOGIC - SINGLE CHANNEL
+// DELIVERY LOGIC - UPDATED (NO SENDER NAME)
 // ==============================
 function deliver_item_to_chat($chat_id, $item) {
     if (!empty($item['message_id']) && is_numeric($item['message_id'])) {
-        forwardMessage($chat_id, CHANNEL_ID, $item['message_id']);
+        // Use COPY instead of FORWARD to hide sender name
+        copyMessage($chat_id, CHANNEL_ID, $item['message_id']);
         return true;
     }
 
