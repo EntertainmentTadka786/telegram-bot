@@ -78,13 +78,14 @@ function is_group_active_time() {
 }
 
 // ==============================
-// Group Timing Restriction Function
+// Group Timing Restriction Function - FIXED
 // ==============================
 function check_group_timing_restriction($chat_id) {
-    $current_day = date('w');
+    $current_day = date('w'); // 0 = Sunday, 6 = Saturday
     $current_hour = (int)date('H');
     $current_minute = (int)date('i');
     
+    // ✅ SUNDAY COMPLETELY OFF
     if ($current_day == 0) {
         $message = "🚫 SUNDAY CLOSED NOTICE\n\n";
         $message .= "📅 Aaj Sunday hai - Group complete day off hai\n\n";
@@ -99,16 +100,33 @@ function check_group_timing_restriction($chat_id) {
         return true;
     }
     
-    $start_time = 10;
-    $end_time = 18;
-    $end_minute = 30;
+    // ✅ Monday-Saturday: 10:00 AM to 6:30 PM check
+    $start_time = 10; // 10 AM
+    $end_time = 18;   // 6 PM
+    $end_minute = 30; // 30 minutes
     
-    if ($current_hour < $start_time || ($current_hour == $end_time && $current_minute > $end_minute) || $current_hour > $end_time) {
+    // Check if outside working hours
+    $is_closed = false;
+    $next_open_time = "";
+    
+    if ($current_hour < $start_time) {
+        $is_closed = true;
+        $next_open_time = "today at 10:00 AM";
+    } 
+    elseif (($current_hour == $end_time && $current_minute > $end_minute) || $current_hour > $end_time) {
+        $is_closed = true;
         $next_open_time = "tomorrow at 10:00 AM";
-        if ($current_day == 6) {
+        
+        // Adjust for weekend
+        if ($current_day == 6) { // Saturday evening
             $next_open_time = "Monday at 10:00 AM";
         }
-        
+        elseif ($current_day == 5) { // Friday evening
+            $next_open_time = "Monday at 10:00 AM";
+        }
+    }
+    
+    if ($is_closed) {
         $message = "⏰ Group is currently CLOSED!\n\n";
         $message .= "🕙 Opening Hours:\n";
         $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
@@ -288,7 +306,7 @@ function apiRequest($method, $params = array(), $is_multipart = false) {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_RETURNTRransFER, true);
         $res = curl_exec($ch);
         if ($res === false) {
             error_log("CURL ERROR: " . curl_error($ch));
