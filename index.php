@@ -47,164 +47,8 @@ $movie_cache = array();
 $waiting_users = array();
 
 // ==============================
-// Time Check Function
+// REMOVED: All timing functions
 // ==============================
-function is_group_active_time() {
-    $current_day = date('w');
-    $current_hour = (int)date('H');
-    $current_minute = (int)date('i');
-    
-    if ($current_day == 0) {
-        return false;
-    }
-    
-    $start_time = 10;
-    $end_time = 18;
-    $end_minute = 30;
-    
-    if ($current_hour > $start_time && $current_hour < $end_time) {
-        return true;
-    }
-    
-    if ($current_hour == $start_time && $current_minute >= 0) {
-        return true;
-    }
-    
-    if ($current_hour == $end_time && $current_minute <= $end_minute) {
-        return true;
-    }
-    
-    return false;
-}
-
-// ==============================
-// Group Timing Restriction Function - FIXED
-// ==============================
-function check_group_timing_restriction($chat_id) {
-    $current_day = date('w'); // 0 = Sunday, 6 = Saturday
-    $current_hour = (int)date('H');
-    $current_minute = (int)date('i');
-    
-    // ✅ SUNDAY COMPLETELY OFF
-    if ($current_day == 0) {
-        $message = "🚫 SUNDAY CLOSED NOTICE\n\n";
-        $message .= "📅 Aaj Sunday hai - Group complete day off hai\n\n";
-        $message .= "🕙 Regular Timing:\n";
-        $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
-        $message .= "• Sunday: Closed\n\n";
-        $message .= "🎬 Bot available hai: @EntertainmentTadkaBot\n";
-        $message .= "📢 Movies channel: @EntertainmentTadka786\n\n";
-        $message .= "😊 Enjoy your Sunday!";
-        
-        sendMessage($chat_id, $message, null, 'HTML');
-        return true;
-    }
-    
-    // ✅ Monday-Saturday: 10:00 AM to 6:30 PM check
-    $start_time = 10; // 10 AM
-    $end_time = 18;   // 6 PM
-    $end_minute = 30; // 30 minutes
-    
-    // Check if outside working hours
-    $is_closed = false;
-    $next_open_time = "";
-    
-    if ($current_hour < $start_time) {
-        $is_closed = true;
-        $next_open_time = "today at 10:00 AM";
-    } 
-    elseif (($current_hour == $end_time && $current_minute > $end_minute) || $current_hour > $end_time) {
-        $is_closed = true;
-        $next_open_time = "tomorrow at 10:00 AM";
-        
-        // Adjust for weekend
-        if ($current_day == 6) { // Saturday evening
-            $next_open_time = "Monday at 10:00 AM";
-        }
-        elseif ($current_day == 5) { // Friday evening
-            $next_open_time = "Monday at 10:00 AM";
-        }
-    }
-    
-    if ($is_closed) {
-        $message = "⏰ Group is currently CLOSED!\n\n";
-        $message .= "🕙 Opening Hours:\n";
-        $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
-        $message .= "• Sunday: Closed\n\n";
-        $message .= "📅 Aaj: " . date('l') . "\n";
-        $message .= "⏰ Time now: " . date('h:i A') . "\n\n";
-        $message .= "🔜 Group will open $next_open_time\n\n";
-        $message .= "🎬 Aap bot use kar sakte hain: @EntertainmentTadkaBot\n";
-        $message .= "📢 Movies channel: @EntertainmentTadka786";
-        
-        sendMessage($chat_id, $message, null, 'HTML');
-        return true;
-    }
-    
-    return false;
-}
-
-// ==============================
-// Auto Group Message
-// ==============================
-function send_group_opening_message() {
-    if (!defined('GROUP_CHANNEL_ID')) return;
-    
-    $current_day = date('w');
-    if ($current_day == 0) return;
-    
-    if (date('H:i') == '10:00') {
-        $message = "🌟 Group is now OPEN!\n\n";
-        $message .= "🕙 Today's Timing: 10:00 AM to 6:30 PM\n";
-        $message .= "🚫 Sunday Closed: Full day off\n";
-        $message .= "🎬 Request movies here: @EntertainmentTadka0786\n";
-        $message .= "📢 Main channel: @EntertainmentTadka786\n\n";
-        $message .= "⚠️ Group will close at 6:30 PM automatically";
-        
-        sendMessage(GROUP_CHANNEL_ID, $message, null, 'HTML');
-    }
-}
-
-function send_group_closing_message() {
-    if (!defined('GROUP_CHANNEL_ID')) return;
-    
-    $current_day = date('w');
-    if ($current_day == 0) return;
-    
-    if (date('H:i') == '18:30') {
-        $message = "⏰ Group is now CLOSED!\n\n";
-        
-        $tomorrow_day = date('w', strtotime('+1 day'));
-        if ($tomorrow_day == 0) {
-            $message .= "🚫 Tomorrow Sunday: Full day closed\n";
-        } else {
-            $message .= "🕙 Will open tomorrow at: 10:00 AM\n";
-        }
-        
-        $message .= "🎬 You can still use bot: @EntertainmentTadkaBot\n";
-        $message .= "📢 Main channel: @EntertainmentTadka786\n\n";
-        $message .= "😴 Goodnight! See you tomorrow!";
-        
-        sendMessage(GROUP_CHANNEL_ID, $message, null, 'HTML');
-    }
-}
-
-function send_sunday_status_message() {
-    if (!defined('GROUP_CHANNEL_ID')) return;
-    
-    if (date('w') == 0 && date('H:i') == '10:00') {
-        $message = "🚫 SUNDAY CLOSED NOTICE\n\n";
-        $message .= "📅 Aaj Sunday hai - Group complete day off hai\n\n";
-        $message .= "🕙 Regular Timing:\n";
-        $message .= "• Monday-Saturday: 10:00 AM to 6:30 PM\n";
-        $message .= "• Sunday: Closed\n\n";
-        $message .= "🎬 Bot available hai: @EntertainmentTadkaBot\n";
-        $message .= "📢 Movies channel: @EntertainmentTadka786\n\n";
-        $message .= "😊 Enjoy your Sunday!";
-        
-        sendMessage(GROUP_CHANNEL_ID, $message, null, 'HTML');
-    }
-}
 
 // ==============================
 // Stats
@@ -297,7 +141,7 @@ function load_movies_from_csv() {
 }
 
 // ==============================
-// Telegram API helpers - UPDATED
+// Telegram API helpers
 // ==============================
 function apiRequest($method, $params = array(), $is_multipart = false) {
     $url = "https://api.telegram.org/bot" . BOT_TOKEN . "/" . $method;
@@ -806,12 +650,7 @@ if ($update) {
         $user_id = $message['from']['id'];
         $text = isset($message['text']) ? $message['text'] : '';
 
-        // Group message restriction check
-        if ($chat_id < 0) {
-            if (check_group_timing_restriction($chat_id)) {
-                exit;
-            }
-        }
+        // REMOVED: Group timing restriction check
         
         $users_data = json_decode(file_get_contents(USERS_FILE), true);
         if (!isset($users_data['users'][$user_id])) {
@@ -849,7 +688,9 @@ if ($update) {
                 $welcome .= "🔍 Examples:\n";
                 $welcome .= "• kgf\n• pushpa\n• avengers\n• hindi movie\n• spider-man\n\n";
                 $welcome .= "❌ Don't type:\n";
-                $welcome .= "• Technical questions\n• Player instructions\n• Non-movie queries\n\n";
+                $welcome .= "• Technical questions\n";
+                $welcome .= "• Player instructions\n";
+                $welcome .= "• Non-movie queries\n\n";
                 $welcome .= "📢 Join: @EntertainmentTadka786\n";
                 $welcome .= "💬 Request/Help: @EntertainmentTadka0786";
                 sendMessage($chat_id, $welcome, null, 'HTML');
@@ -940,9 +781,7 @@ if ($update) {
         }
     }
 
-    send_group_opening_message();
-    send_group_closing_message();
-    send_sunday_status_message();
+    // REMOVED: All timing-based auto messages
 
     if (date('H:i') == '00:00') auto_backup();
     if (date('H:i') == '08:00') send_daily_digest();
