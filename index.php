@@ -5,6 +5,7 @@ ini_set('display_startup_errors', 1);
 error_reporting(E_ALL);
 
 // -------------------- CONFIG --------------------
+// SECURITY NOTE: In production, use environment variables or config file
 define('BOT_TOKEN', '8315381064:AAGk0FGVGmB8j5SjpBvW3rD3_kQHe_hyOWU');
 define('CHANNEL_ID', '-1002831038104');
 define('GROUP_CHANNEL_ID', '-1002831038104');
@@ -45,10 +46,6 @@ if (!file_exists(BACKUP_DIR)) {
 $movie_messages = array();
 $movie_cache = array();
 $waiting_users = array();
-
-// ==============================
-// REMOVED: All timing functions
-// ==============================
 
 // ==============================
 // Stats
@@ -150,7 +147,7 @@ function apiRequest($method, $params = array(), $is_multipart = false) {
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, $params);
-        curl_setopt($ch, CURLOPT_RETURNTRransFER, true);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $res = curl_exec($ch);
         if ($res === false) {
             error_log("CURL ERROR: " . curl_error($ch));
@@ -387,13 +384,34 @@ function advanced_search($chat_id, $query, $user_id = null) {
     global $movie_messages, $waiting_users;
     $q = strtolower(trim($query));
     
+    // 1. Minimum length check
     if (strlen($q) < 2) {
         sendMessage($chat_id, "❌ Please enter at least 2 characters for search");
         return;
     }
     
-    $invalid_keywords = ['vlc', 'audio', 'track', 'change', 'open', 'kar', 'me', 'hai', 'how', 'what', 'problem', 'issue', 'help'];
+    // 2. STRONGER INVALID KEYWORDS FILTER
+    $invalid_keywords = [
+        // Technical words
+        'vlc', 'audio', 'track', 'change', 'open', 'kar', 'me', 'hai',
+        'how', 'what', 'problem', 'issue', 'help', 'solution', 'fix',
+        'error', 'not working', 'download', 'play', 'video', 'sound',
+        'subtitle', 'quality', 'hd', 'full', 'part', 'scene',
+        
+        // Common group chat words
+        'hi', 'hello', 'hey', 'good', 'morning', 'night', 'bye',
+        'thanks', 'thank', 'ok', 'okay', 'yes', 'no', 'maybe',
+        'who', 'when', 'where', 'why', 'how', 'can', 'should',
+        
+        // Hindi common words
+        'kaise', 'kya', 'kahan', 'kab', 'kyun', 'kon', 'kisne',
+        'hai', 'hain', 'ho', 'raha', 'raha', 'rah', 'tha', 'thi',
+        'mere', 'apne', 'tumhare', 'hamare', 'sab', 'log', 'group'
+    ];
+    
+    // 3. SMART WORD ANALYSIS
     $query_words = explode(' ', $q);
+    $total_words = count($query_words);
     
     $invalid_count = 0;
     foreach ($query_words as $word) {
@@ -402,14 +420,22 @@ function advanced_search($chat_id, $query, $user_id = null) {
         }
     }
     
-    if ($invalid_count > 0 && ($invalid_count / count($query_words)) > 0.5) {
+    // 4. STRICTER THRESHOLD - 50% se zyada invalid words ho toh block
+    if ($invalid_count > 0 && ($invalid_count / $total_words) > 0.5) {
         $help_msg = "🎬 Please enter a movie name!\n\n";
-        $help_msg .= "🔍 Examples of movie names:\n";
+        $help_msg .= "🔍 Examples of valid movie names:\n";
         $help_msg .= "• kgf\n• pushpa\n• avengers\n• hindi movie\n• spider-man\n\n";
         $help_msg .= "❌ Technical queries like 'vlc', 'audio track', etc. are not movie names.\n\n";
         $help_msg .= "📢 Join: @EntertainmentTadka786\n";
         $help_msg .= "💬 Help: @EntertainmentTadka0786";
         sendMessage($chat_id, $help_msg, null, 'HTML');
+        return;
+    }
+    
+    // 5. MOVIE NAME PATTERN VALIDATION
+    $movie_pattern = '/^[a-zA-Z0-9\s\-\.\,\&\+\(\)\:\'\"]+$/';
+    if (!preg_match($movie_pattern, $query)) {
+        sendMessage($chat_id, "❌ Invalid movie name format. Only letters, numbers, and basic punctuation allowed.");
         return;
     }
     
@@ -610,6 +636,56 @@ function test_csv($chat_id) {
 }
 
 // ==============================
+// Group Message Filter
+// ==============================
+function is_valid_movie_query($text) {
+    $text = strtolower(trim($text));
+    
+    // Skip commands
+    if (strpos($text, '/') === 0) {
+        return true; // Commands allow karo
+    }
+    
+    // Skip very short messages
+    if (strlen($text) < 3) {
+        return false;
+    }
+    
+    // Common group chat phrases block karo
+    $invalid_phrases = [
+        'good morning', 'good night', 'hello', 'hi ', 'hey ', 'thank you', 'thanks',
+        'welcome', 'bye', 'see you', 'ok ', 'okay', 'yes', 'no', 'maybe',
+        'how are you', 'whats up', 'anyone', 'someone', 'everyone',
+        'problem', 'issue', 'help', 'question', 'doubt', 'query'
+    ];
+    
+    foreach ($invalid_phrases as $phrase) {
+        if (strpos($text, $phrase) !== false) {
+            return false;
+        }
+    }
+    
+    // Movie-like patterns allow karo
+    $movie_patterns = [
+        'movie', 'film', 'video', 'download', 'watch', 'hd', 'full', 'part',
+        'series', 'episode', 'season', 'bollywood', 'hollywood'
+    ];
+    
+    foreach ($movie_patterns as $pattern) {
+        if (strpos($text, $pattern) !== false) {
+            return true;
+        }
+    }
+    
+    // Agar koi specific movie jaisa lagta hai (3+ characters, spaces, numbers allowed)
+    if (preg_match('/^[a-zA-Z0-9\s\-\.\,]{3,}$/', $text)) {
+        return true;
+    }
+    
+    return false;
+}
+
+// ==============================
 // Main update processing (webhook)
 // ==============================
 $update = json_decode(file_get_contents('php://input'), true);
@@ -649,9 +725,22 @@ if ($update) {
         $chat_id = $message['chat']['id'];
         $user_id = $message['from']['id'];
         $text = isset($message['text']) ? $message['text'] : '';
+        $chat_type = $message['chat']['type'] ?? 'private';
 
-        // REMOVED: Group timing restriction check
-        
+        // GROUP MESSAGE FILTERING
+        if ($chat_type !== 'private') {
+            // Group mein sirf valid movie queries allow karo
+            if (strpos($text, '/') === 0) {
+                // Commands allow karo
+            } else {
+                // Random group messages check karo
+                if (!is_valid_movie_query($text)) {
+                    // Invalid message hai, ignore karo
+                    return;
+                }
+            }
+        }
+
         $users_data = json_decode(file_get_contents(USERS_FILE), true);
         if (!isset($users_data['users'][$user_id])) {
             $users_data['users'][$user_id] = [
@@ -780,8 +869,6 @@ if ($update) {
             answerCallbackQuery($query['id'], "❌ Movie not available");
         }
     }
-
-    // REMOVED: All timing-based auto messages
 
     if (date('H:i') == '00:00') auto_backup();
     if (date('H:i') == '08:00') send_daily_digest();
