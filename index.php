@@ -177,7 +177,8 @@ function sendMessage($chat_id, $text, $reply_markup = null, $parse_mode = null) 
     ];
     if ($reply_markup) $data['reply_markup'] = json_encode($reply_markup);
     if ($parse_mode) $data['parse_mode'] = $parse_mode;
-    apiRequest('sendMessage', $data);
+    $result = apiRequest('sendMessage', $data);
+    return json_decode($result, true);
 }
 
 function copyMessage($chat_id, $from_chat_id, $message_id) {
@@ -189,11 +190,12 @@ function copyMessage($chat_id, $from_chat_id, $message_id) {
 }
 
 function forwardMessage($chat_id, $from_chat_id, $message_id) {
-    return apiRequest('forwardMessage', [
+    $result = apiRequest('forwardMessage', [
         'chat_id' => $chat_id,
         'from_chat_id' => $from_chat_id,
         'message_id' => $message_id
     ]);
+    return $result;
 }
 
 function answerCallbackQuery($callback_query_id, $text = null) {
@@ -202,16 +204,36 @@ function answerCallbackQuery($callback_query_id, $text = null) {
     apiRequest('answerCallbackQuery', $data);
 }
 
+function editMessage($chat_id, $message_obj, $new_text, $reply_markup = null) {
+    if (is_array($message_obj) && isset($message_obj['message_id'])) {
+        $data = [
+            'chat_id' => $chat_id,
+            'message_id' => $message_obj['message_id'],
+            'text' => $new_text
+        ];
+        if ($reply_markup) $data['reply_markup'] = json_encode($reply_markup);
+        apiRequest('editMessageText', $data);
+    }
+}
+
 // ==============================
-// DELIVERY LOGIC - UPDATED (NO SENDER NAME)
+// DELIVERY LOGIC - FIXED (CHANNEL NAME & VIEWS WILL SHOW)
 // ==============================
 function deliver_item_to_chat($chat_id, $item) {
     if (!empty($item['message_id']) && is_numeric($item['message_id'])) {
-        // Use COPY instead of FORWARD to hide sender name
-        copyMessage($chat_id, CHANNEL_ID, $item['message_id']);
-        return true;
+        // FORWARD use karo - channel name & views dikhenge
+        $result = json_decode(forwardMessage($chat_id, CHANNEL_ID, $item['message_id']), true);
+        
+        if ($result && $result['ok']) {
+            return true;
+        } else {
+            // Agar forward fail ho, toh copy as fallback
+            copyMessage($chat_id, CHANNEL_ID, $item['message_id']);
+            return true;
+        }
     }
 
+    // Agar message_id nahi hai toh simple text bhejo
     $text = "🎬 " . ($item['movie_name'] ?? 'Unknown') . "\n";
     $text .= "Ref: " . ($item['message_id_raw'] ?? 'N/A') . "\n";
     $text .= "Date: " . ($item['date'] ?? 'N/A') . "\n";
@@ -229,10 +251,19 @@ function get_all_movies_list() {
 
 function paginate_movies(array $all, int $page): array {
     $total = count($all);
-    if ($total === 0) return ['total'=>0,'total_pages'=>1,'page'=>1,'slice'=>[]];
+    if ($total === 0) {
+        return [
+            'total' => 0,
+            'total_pages' => 1, 
+            'page' => 1,
+            'slice' => []
+        ];
+    }
+    
     $total_pages = (int)ceil($total / ITEMS_PER_PAGE);
-    $page = max(1, min($page, $total_pages));
+    $page = max(1, min($page, $total_pages)); // Boundary check
     $start = ($page - 1) * ITEMS_PER_PAGE;
+    
     return [
         'total' => $total,
         'total_pages' => $total_pages,
@@ -242,45 +273,109 @@ function paginate_movies(array $all, int $page): array {
 }
 
 function forward_page_movies($chat_id, array $page_movies) {
+    $total = count($page_movies);
+    if ($total === 0) return;
+    
+    // Progress message bhejo
+    $progress_msg = sendMessage($chat_id, "⏳ Forwarding {$total} movies...");
+    
     $i = 1;
+    $success_count = 0;
+    
     foreach ($page_movies as $m) {
-        $num = str_pad((string)$i, 2, '0', STR_PAD_LEFT);
-        deliver_item_to_chat($chat_id, $m);
-        usleep(300000);
+        $success = deliver_item_to_chat($chat_id, $m);
+        if ($success) $success_count++;
+        
+        // Har 3 movies ke baad progress update karo
+        if ($i % 3 === 0) {
+            editMessage($chat_id, $progress_msg, "⏳ Forwarding... ({$i}/{$total})");
+        }
+        
+        usleep(500000); // 0.5 second delay
         $i++;
     }
+    
+    // Final progress update
+    editMessage($chat_id, $progress_msg, "✅ Successfully forwarded {$success_count}/{$total} movies");
 }
 
 function build_totalupload_keyboard(int $page, int $total_pages): array {
     $kb = ['inline_keyboard' => []];
-    $row = [];
-    if ($page > 1) $row[] = ['text'=>'⏮️ Previous','callback_data'=>'tu_prev_'.($page-1)];
-    if ($page < $total_pages) $row[] = ['text'=>'⏭️ Next','callback_data'=>'tu_next_'.($page+1)];
-    if (!empty($row)) $kb['inline_keyboard'][] = $row;
-    $kb['inline_keyboard'][] = [
-        ['text'=>'🎬 View Movie','callback_data'=>'tu_view_'.$page],
-        ['text'=>'🛑 Stop','callback_data'=>'tu_stop']
-    ];
+    
+    // Navigation buttons - better spacing
+    $nav_row = [];
+    if ($page > 1) {
+        $nav_row[] = ['text' => '⬅️ Previous', 'callback_data' => 'tu_prev_' . ($page - 1)];
+    }
+    
+    // Page indicator as button (non-clickable)
+    $nav_row[] = ['text' => "📄 $page/$total_pages", 'callback_data' => 'current_page'];
+    
+    if ($page < $total_pages) {
+        $nav_row[] = ['text' => 'Next ➡️', 'callback_data' => 'tu_next_' . ($page + 1)];
+    }
+    
+    if (!empty($nav_row)) {
+        $kb['inline_keyboard'][] = $nav_row;
+    }
+    
+    // Action buttons - separate row
+    $action_row = [];
+    $action_row[] = ['text' => '🎬 Send This Page', 'callback_data' => 'tu_view_' . $page];
+    $action_row[] = ['text' => '🛑 Stop', 'callback_data' => 'tu_stop'];
+    
+    $kb['inline_keyboard'][] = $action_row;
+    
+    // Quick jump buttons for first/last pages
+    if ($total_pages > 5) {
+        $jump_row = [];
+        if ($page > 1) {
+            $jump_row[] = ['text' => '⏮️ First', 'callback_data' => 'tu_prev_1'];
+        }
+        if ($page < $total_pages) {
+            $jump_row[] = ['text' => 'Last ⏭️', 'callback_data' => 'tu_next_' . $total_pages];
+        }
+        if (!empty($jump_row)) {
+            $kb['inline_keyboard'][] = $jump_row;
+        }
+    }
+    
     return $kb;
 }
 
 // ==============================
-// /totalupload controller
+// /totalupload controller - IMPROVED
 // ==============================
 function totalupload_controller($chat_id, $page = 1) {
     $all = get_all_movies_list();
     if (empty($all)) {
-        sendMessage($chat_id, "⚠️ Abhi tak koi movie record nahi mila. Baad me try karein.");
+        sendMessage($chat_id, "📭 Koi movies nahi mili! Pehle kuch movies add karo.");
         return;
     }
+    
     $pg = paginate_movies($all, (int)$page);
+    
+    // Pehle current page ki movies forward karo
     forward_page_movies($chat_id, $pg['slice']);
-
-    $title = "📊 Total Uploads\n";
-    $title .= "• Page {$pg['page']}/{$pg['total_pages']}\n";
-    $title .= "• Showing: " . count($pg['slice']) . " of {$pg['total']}\n\n";
-    $title .= "➡️ Navigate with buttons below or tap View Movie to re-send current page.";
-
+    
+    // Better formatted message
+    $title = "🎬 <b>Total Uploads</b>\n\n";
+    $title .= "📊 <b>Statistics:</b>\n";
+    $title .= "• Total Movies: <b>{$pg['total']}</b>\n";
+    $title .= "• Current Page: <b>{$pg['page']}/{$pg['total_pages']}</b>\n";
+    $title .= "• Showing: <b>" . count($pg['slice']) . " movies</b>\n\n";
+    
+    // Current page ki movies list show karo
+    $title .= "📋 <b>Current Page Movies:</b>\n";
+    $i = 1;
+    foreach ($pg['slice'] as $movie) {
+        $movie_name = htmlspecialchars($movie['movie_name'] ?? 'Unknown');
+        $title .= "$i. {$movie_name}\n";
+        $i++;
+    }
+    
+    $title .= "\n📍 Use buttons to navigate or resend current page";
+    
     $kb = build_totalupload_keyboard($pg['page'], $pg['total_pages']);
     sendMessage($chat_id, $title, $kb, 'HTML');
 }
@@ -837,32 +932,13 @@ if ($update) {
             sendMessage($chat_id, "✅ Pagination stopped. Type /totalupload to start again.");
             answerCallbackQuery($query['id'], "Stopped");
         }
+        elseif ($data === 'current_page') {
+            answerCallbackQuery($query['id'], "You're on this page");
+        }
         elseif (strpos($data, 'uploads_page_') === 0) {
             $page = intval(str_replace('uploads_page_', '', $data));
             total_uploads($chat_id, $page);
             answerCallbackQuery($query['id'], "Page $page loaded");
-        }
-        elseif ($data == 'view_current_movie') {
-            $message_text = $query['message']['text'] ?? '';
-            if (preg_match('/Page (\d+)\/(\d+)/', $message_text, $m)) {
-                $current_page = (int)$m[1];
-                $all = get_all_movies_list();
-                $items_per_page = ITEMS_PER_PAGE;
-                $start = ($current_page - 1) * $items_per_page;
-                $current_movies = array_slice($all, $start, $items_per_page);
-                $forwarded = 0;
-                foreach ($current_movies as $movie) {
-                    if (deliver_item_to_chat($chat_id, $movie)) $forwarded++;
-                    usleep(500000);
-                }
-                if ($forwarded > 0) sendMessage($chat_id, "✅ Current page ki $forwarded movies forward ho gayi!\n\n📢 Join: @EntertainmentTadka786");
-                else sendMessage($chat_id, "❌ Kuch technical issue hai. Baad mein try karein.");
-            }
-            answerCallbackQuery($query['id'], "Movies forwarding...");
-        }
-        elseif ($data == 'uploads_stop') {
-            sendMessage($chat_id, "✅ Pagination stopped. Type /totaluploads again to restart.");
-            answerCallbackQuery($query['id'], "Pagination stopped");
         }
         else {
             sendMessage($chat_id, "❌ Movie not found: " . $data);
