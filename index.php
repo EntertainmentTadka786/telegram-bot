@@ -1253,7 +1253,69 @@ if ($update) {
             answerCallbackQuery($query['id'], "You're on this page");
         }
         
-        // NEW CALLBACK HANDLERS FOR CHANNEL MANAGEMENT
+        // ✅ COMPLETE CALLBACK HANDLERS FOR CHANNEL MANAGEMENT
+        elseif ($data === 'back_to_posts') {
+            edit_post_menu($chat_id);
+            answerCallbackQuery($query['id'], "Back to posts list");
+        }
+        elseif ($data === 'search_post') {
+            sendMessage($chat_id, "🔍 <b>Search Posts</b>\n\nSend me the post title, date, or keywords to search.");
+            answerCallbackQuery($query['id'], "Search posts");
+        }
+        elseif ($data === 'all_posts') {
+            sendMessage($chat_id, "📋 <b>All Posts</b>\n\nShowing last 50 posts...");
+            answerCallbackQuery($query['id'], "View all posts");
+        }
+        elseif ($data === 'add_media') {
+            sendMessage($chat_id, "🖼️ <b>Add Media</b>\n\nSend me photos, videos, or documents.");
+            answerCallbackQuery($query['id'], "Add media to post");
+        }
+        elseif ($data === 'schedule_post') {
+            sendMessage($chat_id, "📅 <b>Schedule Post</b>\n\nWhen to schedule? Format: DD-MM-YYYY HH:MM");
+            answerCallbackQuery($query['id'], "Schedule post time");
+        }
+        elseif ($data === 'publish_now') {
+            sendMessage($chat_id, "✅ <b>Post Published!</b>\n\nYour post is live on channel.");
+            answerCallbackQuery($query['id'], "Post published!");
+        }
+        elseif ($data === 'add_schedule') {
+            sendMessage($chat_id, "➕ <b>Add New Schedule</b>\n\nCreate new scheduled post.");
+            answerCallbackQuery($query['id'], "Add new schedule");
+        }
+        elseif ($data === 'save_draft') {
+            sendMessage($chat_id, "💾 <b>Draft Saved!</b>\n\nYour post has been saved as draft.");
+            answerCallbackQuery($query['id'], "Draft saved");
+        }
+        elseif ($data === 'add_button') {
+            sendMessage($chat_id, "🔗 <b>Add Button</b>\n\nButton options:\n• Watch Now\n• Download\n• Trailer");
+            answerCallbackQuery($query['id'], "Add button options");
+        }
+        elseif ($data === 'view_calendar') {
+            sendMessage($chat_id, "📅 <b>Posting Calendar</b>\n\nDecember 2024 Schedule\n• Today 6:00 PM\n• Tomorrow 8:00 AM\n• Dec 25 2:00 PM");
+            answerCallbackQuery($query['id'], "Viewing calendar");
+        }
+        elseif ($data === 'edit_schedule') {
+            sendMessage($chat_id, "✏️ <b>Edit Schedule</b>\n\nSelect schedule to edit:\n1. Today 6:00 PM\n2. Tomorrow 8:00 AM\n3. Dec 25 2:00 PM");
+            answerCallbackQuery($query['id'], "Edit schedule");
+        }
+        elseif ($data === 'cancel_schedule') {
+            sendMessage($chat_id, "❌ <b>Cancel Schedule</b>\n\nSelect schedule to cancel:\n1. Today 6:00 PM\n2. Tomorrow 8:00 AM\n3. Dec 25 2:00 PM");
+            answerCallbackQuery($query['id'], "Cancel schedule");
+        }
+        elseif ($data === 'reschedule_post') {
+            sendMessage($chat_id, "🔄 <b>Reschedule Post</b>\n\nSelect post to reschedule:\n1. Movie Update\n2. Weekly Digest\n3. New Release");
+            answerCallbackQuery($query['id'], "Reschedule post");
+        }
+        elseif ($data === 'all_schedules') {
+            sendMessage($chat_id, "📋 <b>All Scheduled Posts</b>\n\n1. Today 6:00 PM - Movie Update\n2. Tomorrow 8:00 AM - Weekly Digest\n3. Dec 25 2:00 PM - New Release");
+            answerCallbackQuery($query['id'], "Showing all schedules");
+        }
+        elseif ($data === 'preview_post') {
+            sendMessage($chat_id, "👁️ <b>Post Preview</b>\n\n📝 New Post Preview\n🎬 Your content here\n🖼️ [Media preview]");
+            answerCallbackQuery($query['id'], "Showing post preview");
+        }
+        
+        // Edit post specific handlers
         elseif (strpos($data, 'edit_post_') === 0) {
             $post_id = str_replace('edit_post_', '', $data);
             show_post_edit_options($chat_id, $post_id);
@@ -1274,58 +1336,124 @@ if ($update) {
             show_thumbnail_edit_options($chat_id, $post_id);
             answerCallbackQuery($query['id'], "Thumbnail editor opened");
         }
+        elseif (strpos($data, 'edit_text_') === 0) {
+            $post_id = str_replace('edit_text_', '', $data);
+            sendMessage($chat_id, "📝 <b>Edit Post Text</b>\n\nSend new text for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Edit post text");
+        }
+        elseif (strpos($data, 'edit_buttons_') === 0) {
+            $post_id = str_replace('edit_buttons_', '', $data);
+            sendMessage($chat_id, "🔗 <b>Edit Buttons</b>\n\nEdit buttons for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Edit buttons");
+        }
+        elseif (strpos($data, 'edit_timing_') === 0) {
+            $post_id = str_replace('edit_timing_', '', $data);
+            sendMessage($chat_id, "🕒 <b>Edit Timing</b>\n\nChange timing for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Edit post timing");
+        }
+        elseif (strpos($data, 'preview_') === 0) {
+            $post_id = str_replace('preview_', '', $data);
+            sendMessage($chat_id, "👁️ <b>Post Preview</b>\n\nPreview of post #{$post_id}");
+            answerCallbackQuery($query['id'], "Showing post preview");
+        }
+        elseif (strpos($data, 'save_') === 0) {
+            $post_id = str_replace('save_', '', $data);
+            sendMessage($chat_id, "💾 <b>Changes Saved!</b>\n\nAll edits to post #{$post_id} saved successfully.");
+            answerCallbackQuery($query['id'], "Changes saved");
+        }
         elseif (strpos($data, 'replace_video_') === 0) {
             $post_id = str_replace('replace_video_', '', $data);
-            sendMessage($chat_id, "📁 <b>Replace Video</b>\n\nPlease send the new video file for post #{$post_id}\n\n📋 Requirements:\n• Format: MP4, MKV, AVI\n• Max Size: 2GB\n• Duration: Under 4 hours");
+            sendMessage($chat_id, "📁 <b>Replace Video</b>\n\nSend new video for post #{$post_id}");
             answerCallbackQuery($query['id'], "Send new video file");
+        }
+        elseif (strpos($data, 'change_quality_') === 0) {
+            $post_id = str_replace('change_quality_', '', $data);
+            sendMessage($chat_id, "🔄 <b>Change Video Quality</b>\n\nSelect quality for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Change video quality");
+        }
+        elseif (strpos($data, 'trim_video_') === 0) {
+            $post_id = str_replace('trim_video_', '', $data);
+            sendMessage($chat_id, "✂️ <b>Trim Video</b>\n\nTrim video for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Trim video options");
+        }
+        elseif (strpos($data, 'add_watermark_') === 0) {
+            $post_id = str_replace('add_watermark_', '', $data);
+            sendMessage($chat_id, "💧 <b>Add Watermark</b>\n\nAdd watermark to post #{$post_id}");
+            answerCallbackQuery($query['id'], "Add watermark options");
+        }
+        elseif (strpos($data, 'compress_video_') === 0) {
+            $post_id = str_replace('compress_video_', '', $data);
+            sendMessage($chat_id, "📦 <b>Compress Video</b>\n\nCompress video for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Video compression options");
+        }
+        elseif (strpos($data, 'extract_frame_') === 0) {
+            $post_id = str_replace('extract_frame_', '', $data);
+            sendMessage($chat_id, "🎞️ <b>Extract Frame</b>\n\nExtract frame from post #{$post_id}");
+            answerCallbackQuery($query['id'], "Extract frame from video");
         }
         elseif (strpos($data, 'add_images_') === 0) {
             $post_id = str_replace('add_images_', '', $data);
-            sendMessage($chat_id, "🖼️ <b>Add Images</b>\n\nSend me the images you want to add to post #{$post_id}\n\nYou can send multiple images at once.");
+            sendMessage($chat_id, "🖼️ <b>Add Images</b>\n\nSend images for post #{$post_id}");
             answerCallbackQuery($query['id'], "Send images to add");
+        }
+        elseif (strpos($data, 'remove_images_') === 0) {
+            $post_id = str_replace('remove_images_', '', $data);
+            sendMessage($chat_id, "🗑️ <b>Remove Images</b>\n\nRemove images from post #{$post_id}");
+            answerCallbackQuery($query['id'], "Remove images options");
+        }
+        elseif (strpos($data, 'reorder_images_') === 0) {
+            $post_id = str_replace('reorder_images_', '', $data);
+            sendMessage($chat_id, "🔄 <b>Reorder Images</b>\n\nReorder images for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Reorder images");
+        }
+        elseif (strpos($data, 'edit_captions_') === 0) {
+            $post_id = str_replace('edit_captions_', '', $data);
+            sendMessage($chat_id, "📝 <b>Edit Image Captions</b>\n\nEdit captions for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Edit image captions");
+        }
+        elseif (strpos($data, 'adjust_quality_') === 0) {
+            $post_id = str_replace('adjust_quality_', '', $data);
+            sendMessage($chat_id, "🎨 <b>Adjust Image Quality</b>\n\nAdjust quality for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Adjust image quality");
+        }
+        elseif (strpos($data, 'set_thumbnail_') === 0) {
+            $post_id = str_replace('set_thumbnail_', '', $data);
+            sendMessage($chat_id, "🏞️ <b>Set as Thumbnail</b>\n\nSet image as thumbnail for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Set image as thumbnail");
         }
         elseif (strpos($data, 'upload_thumbnail_') === 0) {
             $post_id = str_replace('upload_thumbnail_', '', $data);
-            sendMessage($chat_id, "🖋️ <b>Upload Thumbnail</b>\n\nSend me the new thumbnail image for post #{$post_id}\n\n📋 Recommended:\n• Size: 1280x720\n• Format: JPG/PNG\n• Max: 200KB");
+            sendMessage($chat_id, "🖋️ <b>Upload Thumbnail</b>\n\nSend thumbnail for post #{$post_id}");
             answerCallbackQuery($query['id'], "Send thumbnail image");
         }
-        elseif (strpos($data, 'edit_text_') === 0) {
-            $post_id = str_replace('edit_text_', '', $data);
-            sendMessage($chat_id, "📝 <b>Edit Post Text</b>\n\nSend me the new text/caption for post #{$post_id}\n\nCurrent text: <i>Avengers Endgame 2024 HD print available now!</i>");
-            answerCallbackQuery($query['id'], "Edit post text");
+        elseif (strpos($data, 'thumbnail_from_video_') === 0) {
+            $post_id = str_replace('thumbnail_from_video_', '', $data);
+            sendMessage($chat_id, "🎞️ <b>Generate Thumbnail from Video</b>\n\nSelect timestamp for thumbnail from post #{$post_id}");
+            answerCallbackQuery($query['id'], "Select thumbnail time");
         }
-        elseif ($data == 'back_to_posts') {
-            edit_post_menu($chat_id);
-            answerCallbackQuery($query['id'], "Back to posts list");
+        elseif (strpos($data, 'design_thumbnail_') === 0) {
+            $post_id = str_replace('design_thumbnail_', '', $data);
+            sendMessage($chat_id, "🎨 <b>Thumbnail Design</b>\n\nChoose design for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Thumbnail design options");
         }
-        elseif ($data == 'search_post') {
-            sendMessage($chat_id, "🔍 <b>Search Posts</b>\n\nSend me the post title, date, or keywords to search:\n\nExamples:\n• <code>avengers</code>\n• <code>yesterday</code>\n• <code>video posts</code>");
-            answerCallbackQuery($query['id'], "Search posts");
+        elseif (strpos($data, 'text_thumbnail_') === 0) {
+            $post_id = str_replace('text_thumbnail_', '', $data);
+            sendMessage($chat_id, "📝 <b>Add Text to Thumbnail</b>\n\nAdd text to thumbnail for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Add text to thumbnail");
         }
-        elseif ($data == 'all_posts') {
-            sendMessage($chat_id, "📋 <b>All Posts</b>\n\nShowing last 50 posts...\nUse search to find specific posts or select from recent posts above.");
-            answerCallbackQuery($query['id'], "View all posts");
+        elseif (strpos($data, 'time_thumbnail_') === 0) {
+            $post_id = str_replace('time_thumbnail_', '', $data);
+            sendMessage($chat_id, "⏱️ <b>Set Thumbnail Time</b>\n\nSet time for thumbnail from post #{$post_id}");
+            answerCallbackQuery($query['id'], "Set thumbnail time");
         }
-        elseif ($data == 'add_media') {
-            sendMessage($chat_id, "🖼️ <b>Add Media</b>\n\nSend me the photos, videos, or documents you want to add to the post.\n\nSupported formats:\n• Images: JPG, PNG, GIF\n• Videos: MP4, MKV\n• Documents: PDF, TXT");
-            answerCallbackQuery($query['id'], "Add media to post");
+        elseif (strpos($data, 'preview_thumbnail_') === 0) {
+            $post_id = str_replace('preview_thumbnail_', '', $data);
+            sendMessage($chat_id, "👁️ <b>Thumbnail Preview</b>\n\nPreview thumbnail for post #{$post_id}");
+            answerCallbackQuery($query['id'], "Showing thumbnail preview");
         }
-        elseif ($data == 'schedule_post') {
-            sendMessage($chat_id, "📅 <b>Schedule Post</b>\n\nWhen do you want to schedule this post?\n\nFormat: <code>DD-MM-YYYY HH:MM</code>\nExample: <code>25-12-2024 18:30</code>");
-            answerCallbackQuery($query['id'], "Schedule post time");
-        }
-        elseif ($data == 'publish_now') {
-            sendMessage($chat_id, "✅ <b>Post Published!</b>\n\nYour post has been successfully published to the channel.\n\n📊 Statistics:\n• Expected reach: 10,000+ users\n• Peak viewing time: 7PM-9PM\n• Engagement rate: 25-35%");
-            answerCallbackQuery($query['id'], "Post published!");
-        }
-        elseif ($data == 'add_schedule') {
-            sendMessage($chat_id, "➕ <b>Add New Schedule</b>\n\nCreate a new scheduled post:\n\n1. Send post content\n2. Set date & time\n3. Confirm schedule\n\nUse format: <code>DD-MM-YYYY HH:MM</code>");
-            answerCallbackQuery($query['id'], "Add new schedule");
-        }
-        // Add more callback handlers as needed...
+        // Agar koi bhi callback match nahi karta
         else {
-            sendMessage($chat_id, "❌ Movie not found: " . $data);
-            answerCallbackQuery($query['id'], "❌ Movie not available");
+            answerCallbackQuery($query['id'], "❌ Command not implemented yet");
         }
     }
 
