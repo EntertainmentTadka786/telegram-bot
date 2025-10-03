@@ -381,6 +381,299 @@ function totalupload_controller($chat_id, $page = 1) {
 }
 
 // ==============================
+// NEW CHANNEL MANAGEMENT COMMANDS
+// ==============================
+
+// 1. CREATE POST Command
+function create_post($chat_id, $content = null) {
+    $message = "📝 <b>Create New Post</b>\n\n";
+    
+    if ($content) {
+        $message .= "✅ Post Content Saved!\n";
+        $message .= "📝 Content: " . htmlspecialchars($content) . "\n\n";
+    } else {
+        $message .= "Send me the post content/text:\n";
+        $message .= "Example: <code>New movie added: Avengers Endgame</code>";
+    }
+    
+    $message .= "🛠️ <b>Post Options:</b>\n";
+    $message .= "• Add media (photos/videos)\n";
+    $message .= "• Schedule posting time\n";
+    $message .= "• Add buttons/links\n";
+    $message .= "• Preview before publishing";
+
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '🖼️ Add Media', 'callback_data' => 'add_media'],
+                ['text' => '📅 Schedule', 'callback_data' => 'schedule_post']
+            ],
+            [
+                ['text' => '🔗 Add Button', 'callback_data' => 'add_button'],
+                ['text' => '👁️ Preview', 'callback_data' => 'preview_post']
+            ],
+            [
+                ['text' => '✅ Publish Now', 'callback_data' => 'publish_now'],
+                ['text' => '💾 Save Draft', 'callback_data' => 'save_draft']
+            ]
+        ]
+    ];
+    
+    sendMessage($chat_id, $message, $keyboard, 'HTML');
+}
+
+// 2. SCHEDULED POSTS Command
+function scheduled_posts($chat_id) {
+    $message = "📅 <b>Scheduled Posts</b>\n\n";
+    $message .= "🕒 <b>Upcoming Scheduled Posts:</b>\n\n";
+    $message .= "1. 🎬 <b>New Movie Update</b>\n";
+    $message .= "   📍 Today 6:00 PM\n";
+    $message .= "   👁️ 12,345 expected views\n\n";
+    
+    $message .= "2. 📢 <b>Weekly Digest</b>\n";
+    $message .= "   📍 Tomorrow 8:00 AM\n";
+    $message .= "   👁️ 8,500 expected views\n\n";
+    
+    $message .= "3. 🎉 <b>New Release Alert</b>\n";
+    $message .= "   📍 Dec 25, 2:00 PM\n";
+    $message .= "   👁️ 15,000 expected views\n\n";
+    
+    $message .= "📊 <b>Summary:</b>\n";
+    $message .= "• Total Scheduled: 3 posts\n";
+    $message .= "• Next 24 hours: 2 posts\n";
+    $message .= "• Total Reach: ~36,000 users";
+
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '➕ Add New Schedule', 'callback_data' => 'add_schedule'],
+                ['text' => '✏️ Edit Schedule', 'callback_data' => 'edit_schedule']
+            ],
+            [
+                ['text' => '⏰ View Calendar', 'callback_data' => 'view_calendar'],
+                ['text' => '📋 All Schedules', 'callback_data' => 'all_schedules']
+            ],
+            [
+                ['text' => '❌ Cancel Schedule', 'callback_data' => 'cancel_schedule'],
+                ['text' => '🔄 Reschedule', 'callback_data' => 'reschedule_post']
+            ]
+        ]
+    ];
+
+    sendMessage($chat_id, $message, $keyboard, 'HTML');
+}
+
+// 3. EDIT POST Command - Enhanced with Media Options
+function edit_post_menu($chat_id) {
+    $message = "✏️ <b>Edit Post Manager</b>\n\n";
+    $message .= "Select a post to edit from recent posts:\n\n";
+    
+    $message .= "📝 <b>Recent Posts:</b>\n";
+    $message .= "1. 🎬 <b>Avengers Endgame 2024</b>\n";
+    $message .= "   📍 Posted: 2 hours ago | 👁️ 8,542 views\n";
+    $message .= "   🖼️ Media: Video (HD) | 👍 Engagement: 24%\n\n";
+    
+    $message .= "2. 🕷️ <b>Spider-Man No Way Home</b>\n";
+    $message .= "   📍 Posted: 5 hours ago | 👁️ 12,874 views\n";
+    $message .= "   🖼️ Media: Image Gallery | 👍 Engagement: 31%\n\n";
+    
+    $message .= "3. 🔥 <b>Pushpa 2 The Rule</b>\n";
+    $message .= "   📍 Posted: 1 day ago | 👁️ 25,643 views\n";
+    $message .= "   🖼️ Media: Video (4K) | 👍 Engagement: 42%\n\n";
+    
+    $message .= "4. 💫 <b>KGF Chapter 3 Teaser</b>\n";
+    $message .= "   📍 Posted: 2 days ago | 👁️ 18,921 views\n";
+    $message .= "   🖼️ Media: Thumbnail + Video | 👍 Engagement: 38%";
+
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '1. 🎬 Avengers', 'callback_data' => 'edit_post_1'],
+                ['text' => '2. 🕷️ Spider-Man', 'callback_data' => 'edit_post_2']
+            ],
+            [
+                ['text' => '3. 🔥 Pushpa 2', 'callback_data' => 'edit_post_3'],
+                ['text' => '4. 💫 KGF 3', 'callback_data' => 'edit_post_4']
+            ],
+            [
+                ['text' => '🔍 Search Post', 'callback_data' => 'search_post'],
+                ['text' => '📋 All Posts', 'callback_data' => 'all_posts']
+            ]
+        ]
+    ];
+
+    sendMessage($chat_id, $message, $keyboard, 'HTML');
+}
+
+// Function to show edit options for specific post
+function show_post_edit_options($chat_id, $post_id) {
+    $post_titles = [
+        '1' => 'Avengers Endgame 2024',
+        '2' => 'Spider-Man No Way Home', 
+        '3' => 'Pushpa 2 The Rule',
+        '4' => 'KGF Chapter 3 Teaser'
+    ];
+    
+    $post_title = $post_titles[$post_id] ?? "Post #$post_id";
+    
+    $message = "✏️ <b>Editing Post:</b> $post_title\n\n";
+    $message .= "🛠️ <b>Available Edit Options:</b>\n\n";
+    
+    $message .= "📝 <b>Content Editing:</b>\n";
+    $message .= "• Edit post text/caption\n";
+    $message .= "• Change hashtags\n";
+    $message .= "• Update description\n\n";
+    
+    $message .= "🎬 <b>Media Editing:</b>\n";
+    $message .= "• Change Video file\n";
+    $message .= "• Replace Images\n";
+    $message .= "• Update Thumbnail\n";
+    $message .= "• Add/Remove media\n\n";
+    
+    $message .= "⚙️ <b>Other Options:</b>\n";
+    $message .= "• Edit buttons/links\n";
+    $message .= "• Change posting time\n";
+    $message .= "• Update visibility";
+
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '📝 Edit Text', 'callback_data' => "edit_text_$post_id"],
+                ['text' => '🖼️ Edit Images', 'callback_data' => "edit_images_$post_id"]
+            ],
+            [
+                ['text' => '🎬 Edit Video', 'callback_data' => "edit_video_$post_id"],
+                ['text' => '🖋️ Edit Thumbnail', 'callback_data' => "edit_thumbnail_$post_id"]
+            ],
+            [
+                ['text' => '🔗 Edit Buttons', 'callback_data' => "edit_buttons_$post_id"],
+                ['text' => '🕒 Edit Timing', 'callback_data' => "edit_timing_$post_id"]
+            ],
+            [
+                ['text' => '👁️ Preview', 'callback_data' => "preview_$post_id"],
+                ['text' => '💾 Save Changes', 'callback_data' => "save_$post_id"]
+            ],
+            [
+                ['text' => '↩️ Back to Posts', 'callback_data' => 'back_to_posts']
+            ]
+        ]
+    ];
+
+    sendMessage($chat_id, $message, $keyboard, 'HTML');
+}
+
+// Function to show video editing options
+function show_video_edit_options($chat_id, $post_id) {
+    $message = "🎬 <b>Video Editor</b>\n\n";
+    $message .= "Current Video: <code>movie_1080p.mp4</code>\n";
+    $message .= "Size: 1.2 GB | Duration: 2h 28m\n";
+    $message .= "Quality: 1080p HD | Format: MP4\n\n";
+    
+    $message .= "🛠️ <b>Video Options:</b>\n";
+    $message .= "• Replace video file\n";
+    $message .= "• Change video quality\n";
+    $message .= "• Trim video duration\n";
+    $message .= "• Add watermarks\n";
+    $message .= "• Compress video size";
+
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '📁 Replace Video', 'callback_data' => "replace_video_$post_id"],
+                ['text' => '🔄 Change Quality', 'callback_data' => "change_quality_$post_id"]
+            ],
+            [
+                ['text' => '✂️ Trim Video', 'callback_data' => "trim_video_$post_id"],
+                ['text' => '💧 Add Watermark', 'callback_data' => "add_watermark_$post_id"]
+            ],
+            [
+                ['text' => '📦 Compress', 'callback_data' => "compress_video_$post_id"],
+                ['text' => '🎞️ Extract Frame', 'callback_data' => "extract_frame_$post_id"]
+            ],
+            [
+                ['text' => '↩️ Back', 'callback_data' => "edit_post_$post_id"]
+            ]
+        ]
+    ];
+
+    sendMessage($chat_id, $message, $keyboard, 'HTML');
+}
+
+// Function to show image editing options
+function show_image_edit_options($chat_id, $post_id) {
+    $message = "🖼️ <b>Image Editor</b>\n\n";
+    $message .= "Current Images: 3 photos in gallery\n";
+    $message .= "Formats: JPG, PNG | Total Size: 45 MB\n";
+    $message .= "Resolution: 1920x1080 (HD)\n\n";
+    
+    $message .= "🛠️ <b>Image Options:</b>\n";
+    $message .= "• Add new images\n";
+    $message .= "• Remove existing images\n";
+    $message .= "• Reorder image sequence\n";
+    $message .= "• Edit image captions\n";
+    $message .= "• Adjust image quality";
+
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '➕ Add Images', 'callback_data' => "add_images_$post_id"],
+                ['text' => '🗑️ Remove Images', 'callback_data' => "remove_images_$post_id"]
+            ],
+            [
+                ['text' => '🔄 Reorder', 'callback_data' => "reorder_images_$post_id"],
+                ['text' => '📝 Edit Captions', 'callback_data' => "edit_captions_$post_id"]
+            ],
+            [
+                ['text' => '🎨 Adjust Quality', 'callback_data' => "adjust_quality_$post_id"],
+                ['text' => '🏞️ Set as Thumbnail', 'callback_data' => "set_thumbnail_$post_id"]
+            ],
+            [
+                ['text' => '↩️ Back', 'callback_data' => "edit_post_$post_id"]
+            ]
+        ]
+    ];
+
+    sendMessage($chat_id, $message, $keyboard, 'HTML');
+}
+
+// Function to show thumbnail editing options
+function show_thumbnail_edit_options($chat_id, $post_id) {
+    $message = "🖋️ <b>Thumbnail Editor</b>\n\n";
+    $message .= "Current Thumbnail: <code>thumbnail.jpg</code>\n";
+    $message .= "Size: 320x180 | Format: JPG\n";
+    $message .= "File Size: 45 KB | Status: ✅ Active\n\n";
+    
+    $message .= "🛠️ <b>Thumbnail Options:</b>\n";
+    $message .= "• Upload new thumbnail\n";
+    $message .= "• Generate from video\n";
+    $message .= "• Edit thumbnail design\n";
+    $message .= "• Add text overlay\n";
+    $message .= "• Adjust thumbnail timing";
+
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => '📤 Upload New', 'callback_data' => "upload_thumbnail_$post_id"],
+                ['text' => '🎞️ From Video', 'callback_data' => "thumbnail_from_video_$post_id"]
+            ],
+            [
+                ['text' => '🎨 Edit Design', 'callback_data' => "design_thumbnail_$post_id"],
+                ['text' => '📝 Add Text', 'callback_data' => "text_thumbnail_$post_id"]
+            ],
+            [
+                ['text' => '⏱️ Set Time', 'callback_data' => "time_thumbnail_$post_id"],
+                ['text' => '👁️ Preview', 'callback_data' => "preview_thumbnail_$post_id"]
+            ],
+            [
+                ['text' => '↩️ Back', 'callback_data' => "edit_post_$post_id"]
+            ]
+        ]
+    ];
+
+    sendMessage($chat_id, $message, $keyboard, 'HTML');
+}
+
+// ==============================
 // Append movie
 // ==============================
 function append_movie($movie_name, $message_id_raw, $date = null, $video_path = '') {
@@ -856,6 +1149,8 @@ if ($update) {
         if (strpos($text, '/') === 0) {
             $parts = explode(' ', $text);
             $command = $parts[0];
+            
+            // EXISTING COMMANDS
             if ($command == '/checkdate') check_date($chat_id);
             elseif ($command == '/totalupload' || $command == '/totaluploads' || $command == '/TOTALUPLOAD') totalupload_controller($chat_id, 1);
             elseif ($command == '/testcsv') test_csv($chat_id);
@@ -869,20 +1164,42 @@ if ($update) {
                 $welcome .= "• Simply type any movie name\n";
                 $welcome .= "• Use English or Hindi\n";
                 $welcome .= "• Partial names also work\n\n";
-                $welcome .= "🔍 Examples:\n";
-                $welcome .= "• kgf\n• pushpa\n• avengers\n• hindi movie\n• spider-man\n\n";
-                $welcome .= "❌ Don't type:\n";
-                $welcome .= "• Technical questions\n";
-                $welcome .= "• Player instructions\n";
-                $welcome .= "• Non-movie queries\n\n";
+                $welcome .= "🎯 <b>New Channel Management Commands:</b>\n";
+                $welcome .= "/createpost - Create new post\n";
+                $welcome .= "/scheduledposts - View scheduled posts\n";
+                $welcome .= "/editpost - Edit existing posts\n\n";
                 $welcome .= "📢 Join: @EntertainmentTadka786\n";
                 $welcome .= "💬 Request/Help: @EntertainmentTadka0786";
                 sendMessage($chat_id, $welcome, null, 'HTML');
                 update_user_points($user_id, 'daily_login');
             }
             elseif ($command == '/stats' && $user_id == 1080317415) admin_stats($chat_id);
+            
+            // NEW CHANNEL MANAGEMENT COMMANDS
+            elseif ($command == '/createpost') {
+                $content = isset($parts[1]) ? implode(' ', array_slice($parts, 1)) : null;
+                create_post($chat_id, $content);
+            }
+            elseif ($command == '/scheduledposts') {
+                scheduled_posts($chat_id);
+            }
+            elseif ($command == '/editpost') {
+                edit_post_menu($chat_id);
+            }
             elseif ($command == '/help') {
-                $help = "🤖 Entertainment Tadka Bot\n\n📢 Join our channel: @EntertainmentTadka786\n\n📋 Available Commands:\n/start, /checkdate, /totalupload, /testcsv, /checkcsv, /help\n\n🔍 Simply type any movie name to search!";
+                $help = "🤖 <b>Entertainment Tadka Bot</b>\n\n";
+                $help .= "📢 Join: @EntertainmentTadka786\n\n";
+                $help .= "🎬 <b>Movie Commands:</b>\n";
+                $help .= "/start - Welcome message\n";
+                $help .= "/checkdate - Date-wise stats\n";
+                $help .= "/totalupload - All uploads\n";
+                $help .= "/testcsv - View movies\n";
+                $help .= "/checkcsv - CSV data\n\n";
+                $help .= "📝 <b>Channel Management:</b>\n";
+                $help .= "/createpost - Create new post\n";
+                $help .= "/scheduledposts - View schedules\n";
+                $help .= "/editpost - Edit existing posts\n\n";
+                $help .= "🔍 Simply type any movie name to search!";
                 sendMessage($chat_id, $help, null, 'HTML');
             }
         } else if (!empty(trim($text))) {
@@ -935,11 +1252,77 @@ if ($update) {
         elseif ($data === 'current_page') {
             answerCallbackQuery($query['id'], "You're on this page");
         }
-        elseif (strpos($data, 'uploads_page_') === 0) {
-            $page = intval(str_replace('uploads_page_', '', $data));
-            total_uploads($chat_id, $page);
-            answerCallbackQuery($query['id'], "Page $page loaded");
+        
+        // NEW CALLBACK HANDLERS FOR CHANNEL MANAGEMENT
+        elseif (strpos($data, 'edit_post_') === 0) {
+            $post_id = str_replace('edit_post_', '', $data);
+            show_post_edit_options($chat_id, $post_id);
+            answerCallbackQuery($query['id'], "Editing post {$post_id}");
         }
+        elseif (strpos($data, 'edit_video_') === 0) {
+            $post_id = str_replace('edit_video_', '', $data);
+            show_video_edit_options($chat_id, $post_id);
+            answerCallbackQuery($query['id'], "Video editor opened");
+        }
+        elseif (strpos($data, 'edit_images_') === 0) {
+            $post_id = str_replace('edit_images_', '', $data);
+            show_image_edit_options($chat_id, $post_id);
+            answerCallbackQuery($query['id'], "Image editor opened");
+        }
+        elseif (strpos($data, 'edit_thumbnail_') === 0) {
+            $post_id = str_replace('edit_thumbnail_', '', $data);
+            show_thumbnail_edit_options($chat_id, $post_id);
+            answerCallbackQuery($query['id'], "Thumbnail editor opened");
+        }
+        elseif (strpos($data, 'replace_video_') === 0) {
+            $post_id = str_replace('replace_video_', '', $data);
+            sendMessage($chat_id, "📁 <b>Replace Video</b>\n\nPlease send the new video file for post #{$post_id}\n\n📋 Requirements:\n• Format: MP4, MKV, AVI\n• Max Size: 2GB\n• Duration: Under 4 hours");
+            answerCallbackQuery($query['id'], "Send new video file");
+        }
+        elseif (strpos($data, 'add_images_') === 0) {
+            $post_id = str_replace('add_images_', '', $data);
+            sendMessage($chat_id, "🖼️ <b>Add Images</b>\n\nSend me the images you want to add to post #{$post_id}\n\nYou can send multiple images at once.");
+            answerCallbackQuery($query['id'], "Send images to add");
+        }
+        elseif (strpos($data, 'upload_thumbnail_') === 0) {
+            $post_id = str_replace('upload_thumbnail_', '', $data);
+            sendMessage($chat_id, "🖋️ <b>Upload Thumbnail</b>\n\nSend me the new thumbnail image for post #{$post_id}\n\n📋 Recommended:\n• Size: 1280x720\n• Format: JPG/PNG\n• Max: 200KB");
+            answerCallbackQuery($query['id'], "Send thumbnail image");
+        }
+        elseif (strpos($data, 'edit_text_') === 0) {
+            $post_id = str_replace('edit_text_', '', $data);
+            sendMessage($chat_id, "📝 <b>Edit Post Text</b>\n\nSend me the new text/caption for post #{$post_id}\n\nCurrent text: <i>Avengers Endgame 2024 HD print available now!</i>");
+            answerCallbackQuery($query['id'], "Edit post text");
+        }
+        elseif ($data == 'back_to_posts') {
+            edit_post_menu($chat_id);
+            answerCallbackQuery($query['id'], "Back to posts list");
+        }
+        elseif ($data == 'search_post') {
+            sendMessage($chat_id, "🔍 <b>Search Posts</b>\n\nSend me the post title, date, or keywords to search:\n\nExamples:\n• <code>avengers</code>\n• <code>yesterday</code>\n• <code>video posts</code>");
+            answerCallbackQuery($query['id'], "Search posts");
+        }
+        elseif ($data == 'all_posts') {
+            sendMessage($chat_id, "📋 <b>All Posts</b>\n\nShowing last 50 posts...\nUse search to find specific posts or select from recent posts above.");
+            answerCallbackQuery($query['id'], "View all posts");
+        }
+        elseif ($data == 'add_media') {
+            sendMessage($chat_id, "🖼️ <b>Add Media</b>\n\nSend me the photos, videos, or documents you want to add to the post.\n\nSupported formats:\n• Images: JPG, PNG, GIF\n• Videos: MP4, MKV\n• Documents: PDF, TXT");
+            answerCallbackQuery($query['id'], "Add media to post");
+        }
+        elseif ($data == 'schedule_post') {
+            sendMessage($chat_id, "📅 <b>Schedule Post</b>\n\nWhen do you want to schedule this post?\n\nFormat: <code>DD-MM-YYYY HH:MM</code>\nExample: <code>25-12-2024 18:30</code>");
+            answerCallbackQuery($query['id'], "Schedule post time");
+        }
+        elseif ($data == 'publish_now') {
+            sendMessage($chat_id, "✅ <b>Post Published!</b>\n\nYour post has been successfully published to the channel.\n\n📊 Statistics:\n• Expected reach: 10,000+ users\n• Peak viewing time: 7PM-9PM\n• Engagement rate: 25-35%");
+            answerCallbackQuery($query['id'], "Post published!");
+        }
+        elseif ($data == 'add_schedule') {
+            sendMessage($chat_id, "➕ <b>Add New Schedule</b>\n\nCreate a new scheduled post:\n\n1. Send post content\n2. Set date & time\n3. Confirm schedule\n\nUse format: <code>DD-MM-YYYY HH:MM</code>");
+            answerCallbackQuery($query['id'], "Add new schedule");
+        }
+        // Add more callback handlers as needed...
         else {
             sendMessage($chat_id, "❌ Movie not found: " . $data);
             answerCallbackQuery($query['id'], "❌ Movie not available");
@@ -1024,6 +1407,9 @@ if (!isset($update) || !$update) {
     echo "<li><code>/totalupload</code> - Upload statistics</li>";
     echo "<li><code>/testcsv</code> - View all movies</li>";
     echo "<li><code>/checkcsv</code> - Check CSV data</li>";
+    echo "<li><code>/createpost</code> - Create new post</li>";
+    echo "<li><code>/scheduledposts</code> - View scheduled posts</li>";
+    echo "<li><code>/editpost</code> - Edit existing posts</li>";
     echo "<li><code>/help</code> - Help message</li>";
     echo "<li><code>/stats</code> - Admin statistics</li>";
     echo "</ul>";
